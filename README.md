@@ -1,5 +1,5 @@
 # MVT: Multi-View Transformer for 3D Classification and Segmentation
-By [Abdullah Hamdi](https://abdullahamdi.com/), Bing Li , Silvio Giancola, [Bernard Ghanem](http://www.bernardghanem.com/)
+By [Abdullah Hamdi](https://abdullahamdi.com/), Silvio Giancola, [Bernard Ghanem](http://www.bernardghanem.com/)
 ### [paper | Video | Tutorial . <br>
 I was working on a multiview transformer: a network that can predict how to look properly at a 3d object in MVCNN setup to get max classification/segmentation
 this came after earlier unsuccessful attempts on multiview for point cloud DGCNN (edited).
