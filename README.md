@@ -1,13 +1,7 @@
-# MVT: Multi-View Transformer for 3D Classification and Segmentation
+# MVTN: Multi-View Transformation Network for 3D Shape Recognition
 By [Abdullah Hamdi](https://abdullahamdi.com/), Silvio Giancola, [Bernard Ghanem](http://www.bernardghanem.com/)
 ### [paper | Video | Tutorial . <br>
-I was working on a multiview transformer: a network that can predict how to look properly at a 3d object in MVCNN setup to get max classification/segmentation
-this came after earlier unsuccessful attempts on multiview for point cloud DGCNN (edited).
-this follows after that recent paper from David ross showed that multiview can match other 3d deep learning techniques if done properly
-basically Multi-view is the best way to understand 3d ( at least it is SOTA in classification, segmentation now )
-most previous methods assumed a fixed/random/heuristic view points for the MV methods
-I am challenging this by LEARNING the view angles that minimize the downstream task loss ( ie classification now  and then part segmentation and scene segementation )
-to do that I am using recent Pytorch3D differentiable renderer in order to backpropagate through the rendering process
+**absract**
 
 <img src="https://github.com/ajhamdi/MVTN/blob/master/doc/pipeline.png" width="80%" alt="attack pipeline" align=center>
 
