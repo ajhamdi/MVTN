@@ -9,7 +9,7 @@ most previous methods assumed a fixed/random/heuristic view points for the MV me
 I am challenging this by LEARNING the view angles that minimize the downstream task loss ( ie classification now  and then part segmentation and scene segementation )
 to do that I am using recent Pytorch3D differentiable renderer in order to backpropagate through the rendering process
 
-<img src="https://github.com/ajhamdi/MVT/blob/master/doc/pipeline.png" width="80%" alt="attack pipeline" align=center>
+<img src="https://github.com/ajhamdi/MVTN/master/doc/pipeline.png" width="80%" alt="attack pipeline" align=center>
 
 
 
