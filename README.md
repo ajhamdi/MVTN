@@ -1,12 +1,12 @@
-# MVTN: Multi-View Transformation Network for 3D Shape Recognition
-By [Abdullah Hamdi](https://abdullahamdi.com/), Silvio Giancola, [Bernard Ghanem](http://www.bernardghanem.com/)
+# MVTN: Multi-View Transformation Network for 3D Shape Recognition (ICCV 2021)
+By [Abdullah Hamdi](https://abdullahamdi.com/), [Silvio Giancola](https://www.silviogiancola.com/), [Bernard Ghanem](http://www.bernardghanem.com/)
 ### [paper](https://arxiv.org/pdf/2011.13244.pdf) | [Video]() | [Tutorial]() . <br>
-<br>
 
-The official Pytroch code of ICCV 2021 paper [MVTN: Multi-View Transformation Network for 3D Shape Recognition](https://arxiv.org/abs/2011.13244) . MVTN learns to transform the rendering parameters of a 3D object to improve the perspectives for better recognition by multi-view netowkrs. Without extra supervision or add loss, MVTN improve the performance in 3D classification and shape retrieval. MVTN achieves state-of-the-art performance on ModelNet40, ShapeNet Core55, and the most recent and realistic ScanObjectNN dataset (up to 6% improvement).  
+<br>
 
 <img src="https://github.com/ajhamdi/MVTN/blob/master/doc/pipeline.png" width="80%" alt="MVTN pipeline" align=center>
 
+The official Pytroch code of ICCV 2021 paper [MVTN: Multi-View Transformation Network for 3D Shape Recognition](https://arxiv.org/abs/2011.13244) . MVTN learns to transform the rendering parameters of a 3D object to improve the perspectives for better recognition by multi-view netowkrs. Without extra supervision or add loss, MVTN improve the performance in 3D classification and shape retrieval. MVTN achieves state-of-the-art performance on ModelNet40, ShapeNet Core55, and the most recent and realistic ScanObjectNN dataset (up to 6% improvement).  
 
 ## Citation
 If you find our work useful in your research, please consider citing:
@@ -35,14 +35,14 @@ conda install -c conda-forge trimesh
 ``` 
 
 ## Usage
-The main Python scripts in the root directorty  `mvt_cls.py`.  
- -- MVTN for ModelNet40 classification (**Working in progress**)
+
+The main Python script in the root directorty `mvt_cls.py`. 
 
 First download the data folder from [this link](https://drive.google.com/drive/folders/1CcaD2zWfRPYom05Goi4PTlpt-VHkpYph?usp=sharing) and unzip its content (ModelNet objects meshes are simplified to fit the GPU ). Then you can run MVTN with 
 ```
 python mvt_cls.py --epochs 100 --nb_views 4 --batch-size 4 --selection_type canonical --image_data data/view/classes/ --mesh_data data/ModelNet40/ --simplified_mesh --pretrained --resume  --learning_rate 0.0001
 ```
-- `selection_type` is one of six view selections :  choices=("circular", "random", "spherical" "learned_circular" , "learned_spherical" , "learned_direct")
+- `--selection_type` is one of six view selections :  choices=("circular", "random", "spherical" "learned_circular" , "learned_spherical" , "learned_direct")
 - `--resume` continue training from last checkpoint.
 - `--pretrained` use ImageNet pretrained networks in the CNN
 - `--image_data` the folder for prerendered images ( not needed really ).
@@ -57,7 +57,7 @@ The `ViewSelector` object in `ops.py` is the main class in this work .. it has o
 
 ## Other files
 - `results/` folder saves the results (accuracies, images, and checkpoints) 
-- `custom_dataset.py` includes all the dataloaders for 3D datasets: ModelNEt40, SahpeNet core55 ,ScanObjectNN, and ShapeNet Parts 
+- `custom_dataset.py` includes all the pytorch dataloaders for 3D datasets: ModelNEt40, SahpeNet core55 ,ScanObjectNN, and ShapeNet Parts 
 - `blender_simplify.py` is the Blender code used to simplify the meshes with `simplify_mesh` function from `util.py` as the   following :  
 ```python 
 simplify_ratio  = 0.05 # the ratio of faces to be maintained after simplification 
