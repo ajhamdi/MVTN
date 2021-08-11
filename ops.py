@@ -427,7 +427,7 @@ def clip_grads_(parameters, max_norm, norm_type=2):
     return total_norm
 
 
-class CanonicalViewSelector(nn.Module):
+class CircularViewSelector(nn.Module):
     def __init__(self, nb_views=12, canonical_elevation=35.0, canonical_distance=2.2, shape_features_size=512, transform_distance=False,input_view_noise=0.0):
         super().__init__()
         self.nb_views = nb_views
@@ -684,12 +684,12 @@ class MVTRandomViewSelector(nn.Module):
             return c_views_azim + adjutment_vector[0] * 180.0/self.nb_views,  c_views_elev + adjutment_vector[1] * 90.0, c_views_dist + adjutment_vector[2] * self.canonical_distance + 0.1
 
 class ViewSelector(nn.Module):
-    def __init__(self, nb_views=12, selection_type="canonical", canonical_elevation=30.0, canonical_distance=2.2, shape_features_size=512, transform_distance=False, input_view_noise=0.0, light_direction="fixed"):
+    def __init__(self, nb_views=12, selection_type="circular", canonical_elevation=30.0, canonical_distance=2.2, shape_features_size=512, transform_distance=False, input_view_noise=0.0, light_direction="fixed"):
         super().__init__()
         self.selection_type = selection_type
         self.nb_views = nb_views
-        if self.selection_type == "canonical" or self.selection_type == "custom" or (self.selection_type == "spherical" and self.nb_views == 4):
-            self.chosen_view_selector = CanonicalViewSelector(nb_views=nb_views, canonical_elevation=canonical_elevation,
+        if self.selection_type == "circular" or self.selection_type == "custom" or (self.selection_type == "spherical" and self.nb_views == 4):
+            self.chosen_view_selector = CircularViewSelector(nb_views=nb_views, canonical_elevation=canonical_elevation,
                                                               canonical_distance=canonical_distance, shape_features_size=shape_features_size, transform_distance=transform_distance, input_view_noise=input_view_noise)
         elif self.selection_type == "spherical":
             self.chosen_view_selector = SphericalViewSelector(nb_views=nb_views, canonical_elevation=canonical_elevation,
@@ -777,7 +777,7 @@ class FeatureExtracter(nn.Module):
         super().__init__()
         self.features_size = setup["features_size"]
         self.features_type = setup["features_type"]
-        if setup["selection_type"] == "canonical" or setup["selection_type"] == "random" or setup["selection_type"] == "spherical" or setup["selection_type"] == "custom":
+        if setup["selection_type"] == "circular" or setup["selection_type"] == "random" or setup["selection_type"] == "spherical" or setup["selection_type"] == "custom":
             self.features_origin = "zeros"
         elif setup["return_extracted_features"]:
             self.features_origin = "pre_extracted"

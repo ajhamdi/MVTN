@@ -64,7 +64,7 @@ parser.add_argument('--canonical_elevation', default=30.0, type=float,
                      help='if selection_type== canoncal , the elevation of the view points is givene by this angle')
 parser.add_argument('--canonical_distance', default=2.2, type=float,
                      help='the distnace of the view points from the center if the object  ')
-parser.add_argument('--selection_type', '-s',  default="canonical", choices=["canonical", "random", "learned_offset", "learned_direct", "spherical", "learned_spherical", "learned_random", "learned_transfer","custom"],
+parser.add_argument('--selection_type', '-s',  default="circular", choices=["circular", "random", "learned_offset", "learned_direct", "spherical", "learned_spherical", "learned_random", "learned_transfer", "custom"],
                     help='the selection type of views ')
 parser.add_argument('--plot_freq', default=3, type=int, 
                     help='the frequqency of plotting the renderings and camera positions')

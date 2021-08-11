@@ -9,6 +9,7 @@ import copy
 import pandas as pd
 import pptk
 import imageio
+import trimesh
 from torch import nn
 from torch.nn import Sequential as Seq, Linear as Lin, Conv1d
 import matplotlib
@@ -17,6 +18,30 @@ import matplotlib.pyplot as plt
 
 import glob
 
+
+def simplify_mesh(input_file, simplify_ratio=0.05):
+    """
+    a function to reduce the poly of meshe `input_file` by some ratio `simplify_ratio`
+    Reuturns : the mesh in `input_file` as Trimesh object and the simplified mesh as Trimehs object and saves the simplified mesh with the 
+    based on `https://github.com/HusseinBakri/BlenderPythonDecimator`
+    """
+    project_dir = os.getcwd()
+    if input_file[-3::] == "off":
+        input_obj_file = input_file.replace(".off", ".obj")
+        input_off_file = input_file
+    elif input_file[-3::] == "obj":
+        input_off_file = input_file.replace(".obj", ".off")
+        input_obj_file = input_file
+    mymesh = trimesh.load(input_file)
+    input_file = input_file[:-4]
+    output_obj_file = "{}_SMPLER.obj".format(input_file)
+    if not os.path.isfile(input_obj_file):
+        _ = mymesh.export(input_obj_file)
+    command = "blender -b -P {} -- --ratio {} --inm '{}' --outm '{}'".format(os.path.join(
+        project_dir, "blender_simplify.py"), simplify_ratio, input_obj_file, output_obj_file)
+    os.system(command)
+    reduced_mesh = trimesh.load(output_obj_file)
+    return mymesh,  reduced_mesh
 
 def torch_deg2rad(degs):
     return degs * np.pi/180.0

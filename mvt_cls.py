@@ -72,7 +72,7 @@ parser.add_argument('--canonical_distance', default=2.2, type=float,
                      help='the distnace of the view points from the center if the object  ')
 parser.add_argument('--input_view_noise', default=0.0, type=float,
                     help='the variance of the gaussian noise (before normalization with parametre range) added to the azim,elev,dist inputs to the MVTN ... this option is valid only if `learned_offset` or `learned_direct` options are sleected   ')
-parser.add_argument('--selection_type', '-s',  default="canonical", choices=["canonical", "random", "learned_offset", "learned_direct", "spherical", "learned_spherical", "learned_random", "learned_transfer","custom"],
+parser.add_argument('--selection_type', '-s',  default="circular", choices=["circular", "random", "learned_offset", "learned_direct", "spherical", "learned_spherical", "learned_random", "learned_transfer", "custom"],
                     help='the selection type of views ')
 parser.add_argument('--plot_freq', default=3, type=int, 
                     help='the frequqency of plotting the renderings and camera positions')
@@ -688,16 +688,6 @@ def evluate_late_fusion(data_loader, models_bag,  setup,):
 
     total_loss = 0.0
     n = 0
-    # if retrieval:
-    #     features_training = np.load(setup["feature_file"])
-    #     targets_training = np.load(setup["targets_file"])
-
-    #     features_training = lfda.transform(features_training)
-    #     # print("features_training.shape [training]", features_training.shape, targets_training.shape)
-    #     # from pykdtree.kdtree import KDTree
-
-    #     kdtree = scipy.spatial.KDTree(features_training)
-    #     all_APs = []
 
     views_record = ListDict(
         ["azim", "elev", "dist", "label", "view_nb", "exp_id"])
@@ -725,31 +715,8 @@ def evluate_late_fusion(data_loader, models_bag,  setup,):
                 point_features = torch.cat((point_features[1].view(c_batch, -1), point_features[2].view(c_batch, -1)), 1)
             else:
                 point_features =  point_features[features_order[setup["features_type"]]].view(c_batch, -1)
-            # outputs = models_bag["classifier"](torch.cat((feat, point_features), dim=1))
-            # outputs = models_bag["classifier"](torch.max(feat, point_features))
-            outputs = torch.max(feat, point_features)
 
-              # return features as well
-            # if retrieval:
-            #     feat = feat.cpu().numpy()
-            #     feat = lfda.transform(feat)
-            #     d, idx_closest = kdtree.query(feat, k=len(features_training))
-            #     # loop over queries in the query
-            #     for i_query_batch in range(feat.shape[0]):
-            #         # details on retrieval-mAP: https://towardsdatascience.com/breaking-down-mean-average-precision-map-ae462f623a52#f9ce
-            #         positives = targets_training[idx_closest[i_query_batch, :]
-            #                                      ] == targets[i_query_batch].cpu().numpy()
-            #         # AP: numerator is cumulative of positives, zero-ing negatives
-            #         num = np.cumsum(positives)
-            #         num[~positives] = 0
-            #         # AP: denominator is number of retrieved shapes
-            #         den = np.array(
-            #             [i+1 for i in range(len(features_training))])
-            #         # AP: GTP is number of positive ground truth
-            #         GTP = np.sum(positives)
-            #         # print(den)
-            #         AP = np.sum(num/den)/GTP
-            #         all_APs.append(AP)
+            outputs = torch.max(feat, point_features)
 
             loss = criterion(outputs, targets)
 
@@ -759,17 +726,8 @@ def evluate_late_fusion(data_loader, models_bag,  setup,):
             total += targets.size(0)
             correct += (predicted.cpu() == targets.cpu()).sum()
 
-    # avg_test_acc = 100 * correct / total
-    # avg_loss = total_loss / n
-
     avg_loss = total_loss / n
     avg_test_acc = 100 * correct / total
-    # if retrieval:
-    #     retr_map = 100 * sum(all_APs)/len(all_APs)
-    #     print("avg_loss", avg_loss)
-    #     print("avg_test_acc", avg_test_acc)
-    #     print("retr_map", retr_map)
-    #     return avg_test_acc, retr_map, avg_loss, views_record
 
     return avg_test_acc, avg_loss, views_record
 
@@ -793,14 +751,12 @@ def train_late_fusion(data_loader, models_bag, setup):
         if setup["is_learning_points"]:
             models_bag["fe_optimizer"].zero_grad()
 
-        # inputs = np.stack(inputs, axis=1)
-        # inputs = torch.from_numpy(inputs)
+
         rendered_images, _, azim, elev, dist = auto_render_meshes(
             targets, meshes, extra_info,correction_factor, models_bag, setup, device=None)
 
         targets = targets.cuda()
         targets = Variable(targets)
-        # outputs = models_bag["mvnetwork"](rendered_images)[0]
         feat, _ = models_bag["mvnetwork"](rendered_images)
         features_order = {"logits": 0,"post_max": 1, "transform_matrix": 2}
         extra_info = extra_info.transpose(1, 2).cuda()
@@ -812,8 +768,7 @@ def train_late_fusion(data_loader, models_bag, setup):
              point_features = torch.cat((point_features[1].view(c_batch, -1), point_features[2].view(c_batch, -1)), 1)
         else:
             point_features =  point_features[features_order[setup["features_type"]]].view(c_batch, -1)
-        # outputs = models_bag["classifier"](torch.cat((feat, point_features), dim=1))
-        # outputs = models_bag["classifier"](torch.max(feat, point_features))
+
         outputs = torch.max(feat, point_features)
 
 
@@ -821,15 +776,7 @@ def train_late_fusion(data_loader, models_bag, setup):
         _, predicted = torch.max(outputs.data, 1)
         total += targets.size(0)
 
-        # compute gradient and do SGD step
-        # print("\n\n\nvals:        {:.2f} , {:.2f} , {:.2f}".format(azim[0, 0].item(), elev[0, 0].item(), dist[0, 0].item()))
-        # print("VS ang grads:        ", azim.grad[0, 0].item(), elev.grad[0, 0].item(), dist.grad[0, 0].item())
-
         loss.backward()
-
-        # print("net grads:      ", list(mvnetwork.parameters())[0].data[0, 0, 0, 0].item())
-        # print("\n MVNETWORK grads:      ", np.sum(np.array([np.sum(x.grad.cpu().numpy() ** 2) for x in mvnetwork.parameters()])))
-
         models_bag["optimizer"].step()
         models_bag["cls_optimizer"].step()
         models_bag["fe_optimizer"].step()
@@ -839,28 +786,12 @@ def train_late_fusion(data_loader, models_bag, setup):
             if setup["clip_grads"]:
                 clip_grads_(models_bag["view_selector"].parameters(
                 ), setup["vs_clip_grads_value"])
-            # if setup["log_metrics"]:
-            #     step = get_current_step(models_bag["vs_optimizer"])
-            #     writer.add_scalar('Zoom/loss', loss.item(), step)
-            #     writer.add_scalar(
-            #         'Zoom/MVT_vals', list(models_bag["view_selector"].parameters())[0].data[0, 0].item(), step)
-            #     writer.add_scalar('Zoom/MVT_grads', np.sum(np.array([np.sum(x.grad.cpu(
-            #     ).numpy() ** 2) for x in models_bag["view_selector"].parameters()])), step)
-            #     writer.add_scalar(
-            #         'Zoom/MVCNN_vals', list(models_bag["mvnetwork"].parameters())[0].data[0, 0, 0, 0].item(), step)
-            #     writer.add_scalar('Zoom/MVCNN_grads', np.sum(np.array([np.sum(
-            #         x.grad.cpu().numpy() ** 2) for x in models_bag["mvnetwork"].parameters()])), step)
+
         if setup["is_learning_points"]:
             models_bag["fe_optimizer"].step()
             if setup["clip_grads"]:
                 clip_grads_(models_bag["feature_extractor"].parameters(
                 ), setup["fe_clip_grads_value"])
-            # if setup["log_metrics"]:
-            #     step = get_current_step(models_bag["fe_optimizer"])
-            #     writer.add_scalar('Zoom/PNet_vals', list(filter(lambda p: p.grad is not None, list(
-            #         models_bag["feature_extractor"].parameters())))[0].data[0, 0].item(), step)
-            #     writer.add_scalar('Zoom/PNet_grads', np.sum(np.array([np.sum(x.grad.cpu(
-            #     ).numpy() ** 2) for x in list(filter(lambda p: p.grad is not None, list(models_bag["feature_extractor"].parameters())))])), step)
 
         if (i + 1) % setup["print_freq"] == 0:
             print("\tIter [%d/%d] Loss: %.4f" %
@@ -881,7 +812,6 @@ def evluate_rotation_robustness(data_loader, models_bag,  setup, max_degs=180.0,
 
     total_loss = 0.0
     n = 0
-    # views_record = ListDict(["azim", "elev", "dist","label","view_nb","exp_id"])
     for i, (targets, meshes, extra_info, correction_factor) in enumerate(tqdm(data_loader)):
         with torch.no_grad():
 
@@ -889,8 +819,7 @@ def evluate_rotation_robustness(data_loader, models_bag,  setup, max_degs=180.0,
             rot_axis = [0.0, 1.0, 0.0]
             angles = [np.random.rand()*20.*max_degs -
                       max_degs for _ in range(c_batch)]
-            # inputs = np.stack(inputs, axis=1)
-            # inputs = torch.from_numpy(inputs)
+
             rotR = np.array([rotation_matrix(rot_axis, angle)
                              for angle in angles])
             meshes = Meshes(
@@ -900,7 +829,7 @@ def evluate_rotation_robustness(data_loader, models_bag,  setup, max_degs=180.0,
                 textures=None)
             max_vert = meshes.verts_padded().shape[1]
 
-            # print(len(meshes.faces_list()[0]))
+
             meshes.textures = Textures(verts_rgb=torch.ones(
                 (c_batch, max_vert, 3)) .cuda())
 
@@ -998,12 +927,6 @@ if setup["mvnetwork"] == "mvcnn":
                 writer.add_scalar('Loss/val', avg_loss.item(), epoch)
                 writer.add_scalar('Accuracy/train', avg_train_acc.item(), epoch)
                 writer.add_scalar('Accuracy/val', avg_test_acc.item(), epoch)
-
-
-
-            # Log epoch to tensorboard
-            # See log using: tensorboard --logdir='logs' --port=6006 ######################################
-            # util.logEpoch(logger, mvnetwork, epoch + 1, avg_loss, avg_test_acc) #############################################
             saveables = {'epoch': epoch + 1,
                         'state_dict': models_bag["mvnetwork"].state_dict(),
                         "view_selector": models_bag["view_selector"].state_dict(),
@@ -1053,9 +976,6 @@ if setup["mvnetwork"] == "mvcnn":
         models_bag["view_selector"].eval()
         models_bag["feature_extractor"].eval()
 
-        # avg_train_acc, avg_train_loss = evluate(train_loader, models_bag, setup)
-        # print('\ttrain Acc: %.2f - val Loss: %.4f' %(avg_train_acc.item(), avg_train_loss.item()))
-
         avg_test_acc, avg_test_loss, _ = evluate(val_loader, models_bag, setup)
         print('\tVal Acc: %.2f - val Loss: %.4f' %
             (avg_test_acc.item(), avg_test_loss.item()))
@@ -1069,7 +989,6 @@ if setup["mvnetwork"] == "mvcnn":
             cameras_path = os.path.join(cameras_root_folder,
                 "MV_cameras_{}.jpg".format("test"))
             images_path = os.path.join(renderings_root_folder, "MV_renderings_{}.jpg".format("test"))
-            # extra_info = torch.from_numpy(extra_info)
             auto_render_and_save_images_and_cameras(targets, meshes, extra_info,correction_factor, images_path=images_path,
                                                     cameras_path=cameras_path, models_bag=models_bag, setup=setup, device=None)
     if setup["test_only_retr"]:
