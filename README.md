@@ -32,6 +32,7 @@ This code is tested with Python 3.7 and Pytorch >= 1.4
 conda install pandas
 pip install imageio
 conda install -c conda-forge trimesh
+pip install einops
 ``` 
 
 ## Usage
