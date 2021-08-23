@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
-import math
 from torch.nn import Sequential as Seq, Linear as Lin, Conv1d
 from .blocks import *
+import os
 
 
 def knn(x, k):
@@ -117,7 +117,7 @@ class OrthoLoss(nn.Module):
         prod = torch.bmm(x, torch.transpose(x, 1, 2))
 
         prod = torch.stack([torch.eye(prod.size()[1]) for ii in range(
-            prod.size()[0])]).to(DEVICE) - prod    # minus
+            prod.size()[0])]).to(x.device) - prod    # minus
         norm = torch.norm(prod, 'fro')**2
         return norm
 
@@ -301,3 +301,18 @@ class SimpleDGCNN(nn.Module):
         global_feature = x.view(-1, 1024)
         out = self.classifier(global_feature)
         return out, global_feature , None
+
+
+def load_point_ckpt(model,  network_name,  ckpt_dir='./checkpoint', verbose=True):
+    # ------------------ load ckpt
+    filename = '{}/{}_model.pth'.format(ckpt_dir, network_name)
+    if not os.path.exists(filename):
+        print("No such checkpoint file as:  {}".format(filename))
+        return None
+    state = torch.load(filename)
+    state['state_dict'] = {k: v.cuda() for k, v in state['state_dict'].items()}
+    model.load_state_dict(state['state_dict'])
+    # optimizer.load_state_dict(state['optimizer_state_dict'])
+    # scheduler.load_state_dict(state['scheduler_state_dict'])
+    if verbose:
+        print('Succeefullly loaded model from {}'.format(filename))

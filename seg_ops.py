@@ -33,7 +33,7 @@ def batch_classes2weights(batch_classes, cls_freq):
         batch_classes).cuda() * torch.Tensor(class_weight).cuda()[batch_classes.cpu().numpy().tolist()]
     return c_batch_weights
 
-def render_points_parts(points, color, azim, elev, dist, setup, background_color=(0.0, 0.0, 0.0), device="cuda:0"):
+def render_points_parts(points, color, azim, elev, dist, setup, background_color=(0.0, 0.0, 0.0), ):
     c_batch = azim.shape[0]
     point_cloud = Pointclouds(points=points.to(torch.float).cuda() , features=color *
                               torch.ones_like(points, dtype=torch.float)).cuda()
@@ -78,37 +78,34 @@ def render_points_parts(points, color, azim, elev, dist, setup, background_color
     return rendered_images, indxs , weights  
 
 
-def auto_render_parts(targets, meshes, points, models_bag, setup, color=[], device="cuda:0"):
+def auto_render_parts(targets, meshes, points, models_bag, setup, color=[], ):
     c_batch = len(targets)
     # if the model in test phase use white color
     if len(color)==0: 
-        if setup["object_color"] == "random" and not models_bag["view_selector"].training:
+        if setup["object_color"] == "random" and not models_bag["mvtn"].training:
             color = torch_color("white")
         else:
             color = torch_color(setup["object_color"],
-                                max_lightness=True, epsilon=EPSILON)
+                                max_lightness=True)
     background_color = torch_color(
-        setup["background_color"], max_lightness=True, epsilon=EPSILON).cuda()
-    shape_features = models_bag["feature_extractor"](
-        points, c_batch_size=c_batch).cuda()
-    azim, elev, dist = models_bag["view_selector"](
-        shape_features, batch_size=c_batch)
+        setup["background_color"], max_lightness=True).cuda()
+    azim, elev, dist = models_bag["mvtn"](points, c_batch_size=c_batch)
 
     if not setup["pc_rendering"]:
         # lights = DirectionalLights(
-        #     device=device, direction=models_bag["view_selector"].light_direction(azim, elev, dist, correction_factor))
+        #     device=device, direction=models_bag["mvtn"].light_direction(azim, elev, dist, correction_factor))
 
         # rendered_images, cameras = render_meshes(
         #     meshes=meshes, color=color, azim=azim, elev=elev, dist=dist, lights=lights, setup=setup, device=device, background_color=background_color)
         raise NotImplementedError("this is still not implemented no mesh part sgemtnation for now ")
     else:
         rendered_images, indxs, weights = render_points_parts(
-            points=points, color=color, azim=azim, elev=elev, dist=dist, setup=setup, device=device, background_color=background_color)
+            points=points, color=color, azim=azim, elev=elev, dist=dist, setup=setup, background_color=background_color)
     #### To perform dropout on the views
     rendered_images = nn.functional.dropout2d(
-        rendered_images, p=setup["view_reg"], training=models_bag["view_selector"].training)
+        rendered_images, p=setup["view_reg"], training=models_bag["mvtn"].training)
 
-    if setup["augment_training"] and models_bag["view_selector"].training:
+    if setup["augment_training"] and models_bag["mvtn"].training:
         rendered_images = super_batched_op(
             1, applied_transforms, rendered_images, crop_ratio=setup["crop_ratio"])
     return rendered_images, indxs, weights, azim, elev, dist
@@ -135,7 +132,7 @@ class MVTViewRenderer(nn.Module):
 
         self.view_selector = ViewSelector(
             nb_views=args["nb_views"],
-            selection_type=args["selection_type"],
+            views_config=args["views_config"],
             canonical_elevation=args["canonical_elevation"],
             canonical_distance=args["canonical_distance"],
             shape_features_size=args["features_size"],
@@ -332,7 +329,7 @@ def batched_index_select_parts(x, idx):
     feature = rearrange(feature, 'b d (m h w) p -> b m d p h w',
                         m=num_view, h=H, w=W, d=num_dims)
     return feature
-def compute_image_segment_label_points(points, batch_points_labels, rendered_pix_to_point,rendered_images, setup, device):
+def compute_image_segment_label_points(points, batch_points_labels, rendered_pix_to_point,):
     """
     Compute ground truth segmentation labels for rendered images.
     Args:

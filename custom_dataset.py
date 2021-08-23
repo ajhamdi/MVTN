@@ -3,14 +3,15 @@ from pathlib import Path
 from os import path
 import warnings
 import json
-from torch.utils.data import Dataset
 import numpy as np
+import glob
 import h5py
+import pandas as pd
 from torch.utils.data.dataset import Dataset
 import os
+import torch
 from PIL import Image
-from util import * 
-import re
+from util import torch_center_and_normalize, sort_jointly, load_obj, load_text
 from torch._six import container_abcs, string_classes, int_classes
 # from torch_geometric.io import read_off, read_obj
 import trimesh
@@ -19,13 +20,13 @@ from pytorch3d.structures import Meshes
 from pytorch3d.renderer.mesh import Textures
 
 # 3D transformations functions
-from pytorch3d.transforms import Rotate, Translate
+# from pytorch3d.transforms import Rotate, Translate
 
 # rendering components
-from pytorch3d.renderer import (
-    OpenGLPerspectiveCameras, look_at_view_transform, look_at_rotation,
-    RasterizationSettings, MeshRenderer, MeshRasterizer, BlendParams,
-    SoftSilhouetteShader, HardPhongShader, PointLights)
+# from pytorch3d.renderer import (
+#     OpenGLPerspectiveCameras, look_at_view_transform, look_at_rotation,
+#     RasterizationSettings, MeshRenderer, MeshRasterizer, BlendParams,
+#     SoftSilhouetteShader, HardPhongShader, PointLights)
 
 def  rotation_matrix(axis, theta, in_degrees=True):
     """
@@ -43,55 +44,55 @@ def  rotation_matrix(axis, theta, in_degrees=True):
     return np.array([[aa + bb - cc - dd, 2 * (bc + ad), 2 * (bd - ac)],
                      [2 * (bc - ad), aa + cc - bb - dd, 2 * (cd + ab)],
                      [2 * (bd + ac), 2 * (cd - ab), aa + dd - bb - cc]])
-class MultiViewDataSet(Dataset):
+# class MultiViewDataSet(Dataset):
 
-    def find_classes(self, dir):
-        classes = [d for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d))]
-        classes.sort()
-        class_to_idx = {classes[i]: i for i in range(len(classes))}
+#     def find_classes(self, dir):
+#         classes = [d for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d))]
+#         classes.sort()
+#         class_to_idx = {classes[i]: i for i in range(len(classes))}
 
-        return classes, class_to_idx
+#         return classes, class_to_idx
 
-    def __init__(self, root, data_type, transform=None, target_transform=None):
-        self.x = []
-        self.y = []
-        self.root = root
+#     def __init__(self, root, split, transform=None, target_transform=None):
+#         self.x = []
+#         self.y = []
+#         self.root = root
 
-        self.classes, self.class_to_idx = self.find_classes(root)
+#         self.classes, self.class_to_idx = self.find_classes(root)
 
-        self.transform = transform
-        self.target_transform = target_transform
+#         self.transform = transform
+#         self.target_transform = target_transform
 
-        # root / <label>  / <train/test> / <item> / <view>.png
-        for label in os.listdir(root): # Label
-            for item in os.listdir(root + '/' + label + '/' + data_type):
-                views = []
-                for view in os.listdir(root + '/' + label + '/' + data_type + '/' + item):
-                    views.append(root + '/' + label + '/' + data_type + '/' + item + '/' + view)
+#         # root / <label>  / <train/test> / <item> / <view>.png
+#         for label in os.listdir(root): # Label
+#             for item in os.listdir(root + '/' + label + '/' + split):
+#                 views = []
+#                 for view in os.listdir(root + '/' + label + '/' + split + '/' + item):
+#                     views.append(root + '/' + label + '/' + split + '/' + item + '/' + view)
 
-                self.x.append(views)
-                self.y.append(self.class_to_idx[label])
+#                 self.x.append(views)
+#                 self.y.append(self.class_to_idx[label])
 
-    # Override to give PyTorch access to any image on the dataset
-    def __getitem__(self, index):
-        orginal_views = self.x[index]
-        views = []
+#     # Override to give PyTorch access to any image on the dataset
+#     def __getitem__(self, index):
+#         orginal_views = self.x[index]
+#         views = []
 
-        for view in orginal_views:
-            im = Image.open(view)
-            im = im.convert('RGB')
-            if self.transform is not None:
-                im = self.transform(im)
-            views.append(im)
+#         for view in orginal_views:
+#             im = Image.open(view)
+#             im = im.convert('RGB')
+#             if self.transform is not None:
+#                 im = self.transform(im)
+#             views.append(im)
 
-        return views, self.y[index]
+#         return views, self.y[index]
 
-    # Override to give PyTorch size of dataset
-    def __len__(self):
-        return len(self.x)
+#     # Override to give PyTorch size of dataset
+#     def __len__(self):
+#         return len(self.x)
 
 
-class ThreeMultiViewDataSet(Dataset):
+class ModelNet40(Dataset):
 
     def find_classes(self, dir):
         classes = [d for d in os.listdir(
@@ -101,61 +102,62 @@ class ThreeMultiViewDataSet(Dataset):
 
         return classes, class_to_idx
 
-    def __init__(self, data_type, setup, transform=None, is_rotated=False):
+    def __init__(self, data_dir, split, nb_points=2048, simplified_mesh=False, cleaned_mesh=False, dset_norm=2, return_points_saved=False, is_rotated=False):
         # self.x = []
         self.y = []
-        self.meshes_list =[]
-        self.data_type = data_type
-        self.nb_points = setup["nb_points"]
-        self.root_2D = setup["image_data"]
-        self.root_3D = setup["mesh_data"]
-        self.initial_angle = setup["initial_angle"]
-        self.simplified_mesh = setup["simplified_mesh"]
-        self.cleaned_mesh = setup["cleaned_mesh"]
-        self.dset_norm = setup["dset_norm"]
-        self.return_points_sampled = setup["return_points_sampled"]
-        self.return_points_saved = setup["return_points_saved"]
-        self.return_extracted_features = setup["return_extracted_features"]
-        self.features_type = setup["features_type"]
+        self.data_list =[]
+        self.split = split # train/test
+        self.nb_points = nb_points
+        # self.root_2D = setup["image_data"]
+        self.data_dir = data_dir
+        self.simplified_mesh = simplified_mesh # simplified version of ModelNet40 meshes 
+        self.cleaned_mesh = cleaned_mesh  # corrected version of ModelNet40 meshes by flipping the faces normals of some objects.
+        self.dset_norm = dset_norm
+        self.return_points_sampled = not return_points_saved
+        self.return_points_saved = return_points_saved
+        self.initial_angle = -90 # correcting the pose of the meshes by -90 degrees around the x-axis
 
-        self.classes, self.class_to_idx = self.find_classes(self.root_2D)
+        # self.return_extracted_features = setup["return_extracted_features"]
+        # self.features_type = setup["features_type"]
 
-        self.transform = transform
+        self.classes, self.class_to_idx = self.find_classes(self.data_dir)
+
+        # self.transform = transform
         self.is_rotated = is_rotated
 
         # root / <label>  / <train/test> / <item> / <view>.png
-        for label in os.listdir(self.root_2D):  # Label
-            for item in os.listdir(self.root_2D + '/' + label + '/' + self.data_type):
-                views = []
-                for view in os.listdir(self.root_2D + '/' + label + '/' + self.data_type + '/' + item):
-                    views.append(self.root_2D + '/' + label + '/' +
-                                 self.data_type + '/' + item + '/' + view)
+        for label in os.listdir(self.data_dir):  # Label
+            for item in os.listdir(self.data_dir + '/' + label + '/' + self.split):
+                # views = []
+                # for view in os.listdir(self.data_dir + '/' + label + '/' + self.split + '/' + item):
+                    # views.append(self.data_dir + '/' + label + '/' +
+                    #              self.split + '/' + item + '/' + view)
 
                 # self.x.append(views)
-                self.y.append(self.class_to_idx[label])
-                self.meshes_list.append(
-                    self.root_3D + '/' + label + '/' + self.data_type + '/' + item)
+                if item.endswith(".off"):
+                    self.y.append(self.class_to_idx[label])
+                    self.data_list.append(self.data_dir + '/' + label + '/' + self.split + '/' + item)
 
-        self.simplified_meshes_list = [file_name.replace(
-            ".off", "_SMPLER.obj") for file_name in self.meshes_list if file_name[-4::]==".off"]
-        # self.cleaned_meshes_list = [file_name.replace(
-        #     ".off", "_RMV.obj") for file_name in self.meshes_list if file_name[-4::]==".off"]
-        self.extracted_features_list = [file_name.replace(".off", "_PFeautres.pkl") for file_name in self.meshes_list if file_name[-4::] == ".off"]
-        self.points_list = [file_name.replace(".off", "POINTS.pkl") for file_name in self.meshes_list if file_name[-4::] == ".off"]
-        self.meshes_list, self.simplified_meshes_list, self.y, self.points_list, self.extracted_features_list = sort_jointly(
-            [self.meshes_list, self.simplified_meshes_list, self.y, self.points_list, self.extracted_features_list], dim=0)
+        self.simplified_data_list = [file_name.replace(
+            ".off", "_SMPLER.obj") for file_name in self.data_list if file_name[-4::]==".off"]
+        # self.cleaned_data_list = [file_name.replace(
+        #     ".off", "_RMV.obj") for file_name in self.data_list if file_name[-4::]==".off"]
+        # self.extracted_features_list = [file_name.replace(".off", "_PFeautres.pkl") for file_name in self.data_list if file_name[-4::] == ".off"]
+        self.points_list = [file_name.replace(".off", "POINTS.pkl") for file_name in self.data_list if file_name[-4::] == ".off"]
+        self.data_list, self.simplified_data_list, self.y, self.points_list = sort_jointly(
+            [self.data_list, self.simplified_data_list, self.y, self.points_list], dim=0)
         if self.is_rotated:
-            df = pd.read_csv(os.path.join(self.root_3D,"..", "rotated_modelnet_{}.csv".format(self.data_type)), sep=",")
-            self.rotations_list = [df[df.mesh_path.isin([x])].to_dict("list") for x in self.meshes_list]
+            df = pd.read_csv(os.path.join(self.data_dir,"..", "rotated_modelnet_{}.csv".format(self.split)), sep=",")
+            self.rotations_list = [df[df.mesh_path.isin([x])].to_dict("list") for x in self.data_list]
         
-        self.correction_factors = [1.0]*len(self.meshes_list)
+        self.correction_factors = [1]*len(self.data_list)
         if self.cleaned_mesh:
-            fault_mesh_list = load_text(os.path.join(self.root_3D, "..", "{}_faults.txt".format(self.data_type)))
+            fault_mesh_list = load_text(os.path.join(self.data_dir, "..", "{}_faults.txt".format(self.split)))
             fault_mesh_list = [int(x) for x in fault_mesh_list]
             for x in fault_mesh_list:
-                self.correction_factors[x] = -1.0
+                self.correction_factors[x] = -1
         
-            # print("@@@@@@@@@@@", self.rotations_list[0], self.meshes_list[0])
+            # print("@@@@@@@@@@@", self.rotations_list[0], self.data_list[0])
 
 
     # Override to give PyTorch access to any image on the dataset
@@ -170,12 +172,12 @@ class ThreeMultiViewDataSet(Dataset):
         #         im = self.transform(im)
         #     views.append(im)
         if not self.simplified_mesh :
-            threeobject = trimesh.load(self.meshes_list[index])
-            # threeobject = read_off(self.meshes_list[index])
+            threeobject = trimesh.load(self.data_list[index])
+            # threeobject = read_off(self.data_list[index])
             # verts = threeobject.pos.numpy()
             # faces = threeobject.face.transpose(0, 1).numpy()
         else:
-            threeobject = trimesh.load(self.simplified_meshes_list[index])
+            threeobject = trimesh.load(self.simplified_data_list[index])
         
 
         if not self.is_rotated:
@@ -188,6 +190,9 @@ class ThreeMultiViewDataSet(Dataset):
 
         verts = np.array(threeobject.vertices.data.tolist())
         faces = np.array(threeobject.faces.data.tolist())
+        if self.correction_factors[index] == -1 and self.cleaned_mesh and self.simplified_mesh: # flip the faces 
+            faces[:,0] , faces[:,2] = faces[:,2] , faces[:,0]
+
         verts = rotation_matrix(rot_axis, angle).dot(verts.T).T
         verts = torch_center_and_normalize(torch.from_numpy(
             verts).to(torch.float), p=self.dset_norm)
@@ -206,6 +211,7 @@ class ThreeMultiViewDataSet(Dataset):
             faces=[faces],
             textures=textures
         )
+        points = None
         if self.return_points_sampled or self.return_points_saved:
             if self.return_points_sampled:
                 points = threeobject.sample(self.nb_points, False)
@@ -213,25 +219,25 @@ class ThreeMultiViewDataSet(Dataset):
                 points = load_obj(self.points_list[index])
             points = torch.from_numpy(rotation_matrix(rot_axis, angle).dot(points.T).T).to(torch.float)
             points = torch_center_and_normalize(points, p=self.dset_norm)
-            # if self.data_type =="train":
+            # if self.split =="train":
             #     points = torch_augment_pointcloud(points)
-            return self.y[index], mesh, points, self.correction_factors[index]
-        elif self.return_extracted_features:
-            features = load_obj(self.extracted_features_list[index])
-            if self.features_type == "logits_trans":
-                features = np.concatenate((features["logits"].reshape(-1), features["transform_matrix"].reshape(-1)),0)
-            elif self.features_type == "post_max_trans":
-                features = np.concatenate(
-                    (features["post_max"].reshape(-1), features["transform_matrix"].reshape(-1)), 0)
-            else :
-                features = features[self.features_type].reshape(-1)
+        return self.y[index], mesh, points #, self.correction_factors[index]
+        # elif self.return_extracted_features:
+        #     features = load_obj(self.extracted_features_list[index])
+        #     if self.features_type == "logits_trans":
+        #         features = np.concatenate((features["logits"].reshape(-1), features["transform_matrix"].reshape(-1)),0)
+        #     elif self.features_type == "post_max_trans":
+        #         features = np.concatenate(
+        #             (features["post_max"].reshape(-1), features["transform_matrix"].reshape(-1)), 0)
+        #     else :
+        #         features = features[self.features_type].reshape(-1)
 
-            # if self.data_type =="train":
-            #     points = torch_augment_pointcloud(points)
-            # print(features[self.features_type].shape)
-            return self.y[index], mesh, features, self.correction_factors[index]
-        else :
-            return self.y[index], mesh, None, self.correction_factors[index]
+        #     # if self.split =="train":
+        #     #     points = torch_augment_pointcloud(points)
+        #     # print(features[self.features_type].shape)
+        #     return self.y[index], mesh, features, self.correction_factors[index]
+        # else :
+        #     return self.y[index], mesh, None #, self.correction_factors[index]
 
     # Override to give PyTorch size of dataset
     def __len__(self):

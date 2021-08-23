@@ -1,3 +1,5 @@
+import matplotlib.pyplot as plt
+from ptflops import get_model_complexity_info
 import mpl_toolkits
 import torch
 import math
@@ -14,15 +16,32 @@ from torch import nn
 from torch.nn import Sequential as Seq, Linear as Lin, Conv1d
 import matplotlib
 matplotlib.use('Agg')
-import matplotlib.pyplot as plt
+
 
 import glob
+import json
+import yaml
 
+
+
+def read_json(file_path):
+    """
+    read config files 
+    """
+    with open(file_path, "r") as f:
+        return json.load(f)
+
+def read_yaml(file_path):
+    """
+    read config files
+    """
+    with open(file_path, "r") as f:
+        return yaml.safe_load(f)
 
 def simplify_mesh(input_file, simplify_ratio=0.05):
     """
     a function to reduce the poly of meshe `input_file` by some ratio `simplify_ratio`
-    Reuturns : the mesh in `input_file` as Trimesh object and the simplified mesh as Trimehs object and saves the simplified mesh with the 
+    Reuturns : the mesh in `input_file` as Trimesh object and the simplified mesh as Trimeh object and saves the simplified mesh with the 
     based on `https://github.com/HusseinBakri/BlenderPythonDecimator`
     """
     project_dir = os.getcwd()
@@ -66,7 +85,7 @@ def torch_direction_vector(azim, elev, from_degrees=True):
 
 def class_freq_to_weight(class_freqs):
     """
-    a function to convert  a dict label frequency  to dict of loss weights per class label that are averaged to 1
+    a function to convert  a dictionary of labels frequency  to dictionary of loss weights per class label that are averaged to 1. This is helpful in designing a weighted loss 
     """
     total = 0
     result_weights = {}
@@ -296,7 +315,7 @@ def chop_ptc(points, factor=0.1, axis=0):
 
 def torch_color(color_type,custom_color=(1.0,0,0),max_lightness=False,epsilon=0.00001):
     """
-    a function to restun a torch tesnor of size 3 that represent a color according to the 'color_type' string that can be [white,red,green,black,random,custom] .. if max_lightness is true , color is normlaized to be brightest
+    a function to return a torch tesnor of size 3 that represent a color according to the 'color_type' string that can be [white,red,green,black,random,custom] .. if max_lightness is true , color is normlaized to be brightest
     """
     if color_type == "white":
         color =  torch.tensor((1.0, 1.0, 1.0))
@@ -383,7 +402,7 @@ def seed_torch(seed=0):
     # torch.backends.cudnn.benchmark = False
     # torch.backends.cudnn.deterministic = True
     # torch.backends.cudnn.enabled = False
-def check_valid_rotation_matrix(R, tol: float = 1e-7):
+def check_valid_rotation_matrix(R, tol: float = 1e-6):
     """
     Determine if R is a valid rotation matrix by checking it satisfies the
     following conditions:
@@ -679,6 +698,9 @@ def load_obj(name):
 
 
 def devide_points_by_labels(points, labels):
+    """
+    divides the point clouds `points` as numpy array into a list of point clouds each belonging to one of the labels in `labels` 
+    """
     return [points[labels == lbl] for lbl in np.unique(labels)]
 
 
@@ -760,6 +782,9 @@ def dict_dict_to_matrix(mydict, order=None):
 
 
 def gif_folder(data_dir, extension="jpg", duration=None):
+    """
+    converts a folder of images in `data_dir` into a gif named `animation.gif` in the same directory  
+    """
     image_collection = []
     for img_name in sorted(glob.glob(data_dir + "/*." + extension)):
         image_collection.append(imageio.imread(img_name))
@@ -948,7 +973,8 @@ class ListDict(object):
 
     def items(self):
         return self.listdict.items()
-
+    # def save(self,save_file):
+    #     raise NotImplementedError
 
 def log_setup(setup, setups_file):
     """
@@ -976,6 +1002,9 @@ def load_results(load_file):
 
 
 def down_sample_ptc(points, target):
+    """
+    downsamples a numpy point cloud `points` to a `target` number of points
+    """
     if target > points.shape[0]:
         return points
     import random
@@ -983,6 +1012,9 @@ def down_sample_ptc(points, target):
 
 
 def down_sample_ptc_batch(points_batch, target):
+    """
+    downsamples a batch of numpy point clouds `points_batch` to a `target` number of points
+    """
     down_sampled_batch = []
     for ii in range(points_batch.shape[0]):
         down_sampled_batch.append(
@@ -999,3 +1031,17 @@ def up_sample_ptc_batch(points_batch, target):
     for ii in range(points_batch.shape[0]):
         up_sampled_batch.append(up_sample_ptc(points_batch[ii, ...], target))
     return np.array(up_sampled_batch)
+
+
+def fully_profile_network(model, input_size=(3, 224, 224), MAX_ITER=10000, verbose=False):
+    """
+    fully characterize a Pytorch model in terms of speed (ms), number of parameters (M), and, number of operations (GFLOPS)
+    """
+    macs, params = get_model_complexity_info(
+        model, input_size, as_strings=False, print_per_layer_stat=False, verbose=verbose)
+    inp = torch.rand((1, *input_size)).cuda()
+    avg_time = profile_op(MAX_ITER, model.cuda(), inp)
+    if verbose:
+        print(model, "\n\n\n" "\t", macs, "\t",
+              params, "\t", "{}".format(avg_time*1e3))
+    return 2 * macs * 1e-9, params*1e-6, avg_time*1e3

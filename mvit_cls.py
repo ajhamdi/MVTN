@@ -28,11 +28,15 @@ import os
 from util import *
 from ops import *
 from seg_ops import * 
+from models.mvtn import *
+from models.multi_view import *
+from models.renderer import *
+
 
 
 # from logger import Logger
 from torch.utils.tensorboard import SummaryWriter
-from custom_dataset import MultiViewDataSet, ThreeMultiViewDataSet, collate_fn, ShapeNetCore, ScanObjectNN, PartNormalDataset  # , ModelNet40
+from custom_dataset import ModelNet40, collate_fn, ShapeNetCore, ScanObjectNN, PartNormalDataset  # , ModelNet40
 
 
 PLOT_SAMPLE_NBS = [222,357, 1402, 1984, 1057, 2201, 1355, 1875]
@@ -52,8 +56,8 @@ parser.add_argument('--epochs', default=100, type=int,  help='number of total ep
 parser.add_argument('-b', '--batch-size', default=20, type=int,
                      help='mini-batch size (default: 4)')
 
-parser.add_argument('--image_data',required=False,  help='path to 2D dataset')
-parser.add_argument('--mesh_data', required=True,  help='path to 3D dataset')
+# parser.add_argument('--image_data',required=False,  help='path to 2D dataset')
+parser.add_argument('--data_dir', required=True,  help='path to 3D dataset')
 parser.add_argument('--exp_set', type=str, default='00', help='pick ')
 parser.add_argument('--exp_id', type=str, default='random', help='pick ')
 parser.add_argument('--nb_views', default=4, type=int, 
@@ -61,10 +65,10 @@ parser.add_argument('--nb_views', default=4, type=int,
 parser.add_argument('--image_size', default=224, type=int, 
                     help='the size of the images rendered by the differntibe renderer ( other poissible 384)')
 parser.add_argument('--canonical_elevation', default=30.0, type=float,
-                     help='if selection_type== canoncal , the elevation of the view points is givene by this angle')
+                     help='if views_config== canoncal , the elevation of the view points is givene by this angle')
 parser.add_argument('--canonical_distance', default=2.2, type=float,
                      help='the distnace of the view points from the center if the object  ')
-parser.add_argument('--selection_type', '-s',  default="circular", choices=["circular", "random", "learned_offset", "learned_direct", "spherical", "learned_spherical", "learned_random", "learned_transfer", "custom"],
+parser.add_argument('--views_config', '-s',  default="circular", choices=["circular", "random", "learned_offset", "learned_direct", "spherical", "learned_spherical", "learned_random", "learned_transfer", "custom"],
                     help='the selection type of views ')
 parser.add_argument('--plot_freq', default=3, type=int, 
                     help='the frequqency of plotting the renderings and camera positions')
@@ -112,8 +116,11 @@ parser.add_argument('--return_points_sampled', dest='return_points_sampled',
                     action='store_true', help='reuturn 3d point clouds from the data loader sampled from hte mesh ')
 parser.add_argument('--return_points_saved', dest='return_points_saved',
                     action='store_true', help='reuturn 3d point clouds from the data loader saved under `filePOINTS.pkl` ')
-parser.add_argument('--return_extracted_features', dest='return_extracted_features',
-                    action='store_true', help='return pre extracted features `*_PFeatures.pt` for each 3d model from the dataloader ')
+parser.add_argument('--input_view_noise', default=0.0, type=float,
+                    help='the variance of the gaussian noise (before normalization with parametre range) added to the azim,elev,dist inputs to the MVTN ... this option is valid only if `learned_offset` or `learned_direct` options are sleected   ')
+
+# parser.add_argument('--return_extracted_features', dest='return_extracted_features',
+#                     action='store_true', help='return pre extracted features `*_PFeatures.pt` for each 3d model from the dataloader ')
 parser.add_argument('--custom_views_mode', dest='custom_views_mode',
                     action='store_true', help=' test MVCNN with `custom` views ')
 parser.add_argument('--features_type', '-ftpe',  default="post_max", choices=["logits", "post_max", "transform_matrix",                                                                              "pre_linear", "logits_trans", "post_max_trans", "pre_linear_trans"],help='the type of the features extracted from the feature extractor ( early , middle , late) ')
@@ -124,7 +131,7 @@ parser.add_argument('--light_direction', '-ldrct',  default="random", choices=["
 parser.add_argument('--cull_backfaces', dest='cull_backfaces',
                     action='store_true', help='cull back_faces ( remove them from the image) ')
 parser.add_argument('--view_reg', default=0.0, type=float,
-                    help='use regulizer to the learned view selector so they can be apart ...ONLY when `selection_type` == learned_direct   (default: 0.0)')
+                    help='use regulizer to the learned view selector so they can be apart ...ONLY when `views_config` == learned_direct   (default: 0.0)')
 
 ## point cloud rnedienring 
 parser.add_argument('--pc_rendering', dest='pc_rendering',
@@ -141,8 +148,8 @@ parser.add_argument('--background_color', '-bgc',  default="white", choices=["wh
                     help='the color of the background of the rendered images')
 parser.add_argument('--dset_norm', '-dstn',  default="2", choices=["inf", "2","1","fro","no"],
                     help='the L P normlization tyoe of the 3D dataset')
-parser.add_argument('--initial_angle', default=-90.0, type=float,
-                    help='the inital tilt angle of the 3D object as loaded from the ModelNet40 dataset  ')                  
+# parser.add_argument('--initial_angle', default=-90.0, type=float,
+#                     help='the inital tilt angle of the 3D object as loaded from the ModelNet40 dataset  ')                  
 parser.add_argument('--augment_training', dest='augment_training',
                     action='store_true', help='augment the training of the CNN by scaling , rotation , translation , etc ')
 parser.add_argument('--crop_ratio', default=0.3, type=float,
@@ -216,26 +223,27 @@ transform = None
 
 # device = torch.device("cuda:{}".format(str(setup["gpu"])) if torch.cuda.is_available() else "cpu")
 torch.cuda.set_device(int(setup["gpu"]))
-if "modelnet" in setup["mesh_data"].lower():
-    dset_train = ThreeMultiViewDataSet(
-        'train', setup, transform=transform, is_rotated=False)
-    dset_val = ThreeMultiViewDataSet(
-    'test', setup, transform=transform, is_rotated=False)
+if "modelnet" in setup["data_dir"].lower():
+    dset_train = ModelNet40(setup["data_dir"], "train", nb_points=setup["nb_points"], simplified_mesh=setup["simplified_mesh"], cleaned_mesh=setup["cleaned_mesh"], dset_norm=setup["dset_norm"], return_points_saved=setup["return_points_saved"],
+                            is_rotated=setup["rotated_train"])
+    dset_val = ModelNet40(setup["data_dir"], "test", nb_points=setup["nb_points"], simplified_mesh=setup["simplified_mesh"], cleaned_mesh=setup["cleaned_mesh"], dset_norm=setup["dset_norm"], return_points_saved=setup["return_points_saved"],
+                          is_rotated=setup["rotated_test"])
     classes = dset_train.classes
 
-elif "shapenetcore" in setup["mesh_data"].lower():
-    dset_train = ShapeNetCore(setup["mesh_data"],("train",), setup["nb_points"], load_textures=False, dset_norm=setup["dset_norm"],simplified_mesh=setup["simplified_mesh"])
-    dset_val = ShapeNetCore(setup["mesh_data"],("test",), setup["nb_points"], load_textures=False, dset_norm=setup["dset_norm"],simplified_mesh=setup["simplified_mesh"])
+
+elif "shapenetcore" in setup["data_dir"].lower():
+    dset_train = ShapeNetCore(setup["data_dir"],("train",), setup["nb_points"], load_textures=False, dset_norm=setup["dset_norm"],simplified_mesh=setup["simplified_mesh"])
+    dset_val = ShapeNetCore(setup["data_dir"],("test",), setup["nb_points"], load_textures=False, dset_norm=setup["dset_norm"],simplified_mesh=setup["simplified_mesh"])
     # dset_train, dset_val = torch.utils.data.random_split(shapenet, [int(.8*len(shapenet)), int(np.ceil(0.2*len(shapenet)))])  #, generator=torch.Generator().manual_seed(42))   ## to reprodebel results 
     classes = dset_val.classes
-elif "scanobjectnn" in setup["mesh_data"].lower():
-    dset_train = ScanObjectNN(setup["mesh_data"], 'train',  setup["nb_points"],
+elif "scanobjectnn" in setup["data_dir"].lower():
+    dset_train = ScanObjectNN(setup["data_dir"], 'train',  setup["nb_points"],
                               variant=setup["dset_variant"], dset_norm=setup["dset_norm"])
-    dset_val = ScanObjectNN(setup["mesh_data"], 'test',  setup["nb_points"], variant=setup["dset_variant"], dset_norm=setup["dset_norm"])
+    dset_val = ScanObjectNN(setup["data_dir"], 'test',  setup["nb_points"], variant=setup["dset_variant"], dset_norm=setup["dset_norm"])
     classes = dset_train.classes
-elif "part" in setup["mesh_data"].lower():
-    dset_train = PartNormalDataset(root=setup["mesh_data"], npoints=setup["nb_points"], split='trainval', class_choice=None, normal_channel=setup["use_normals"])
-    dset_val = PartNormalDataset(root=setup["mesh_data"], npoints=setup["nb_points"],                                 split='test', class_choice=None, normal_channel=setup["use_normals"])
+elif "part" in setup["data_dir"].lower():
+    dset_train = PartNormalDataset(root=setup["data_dir"], npoints=setup["nb_points"], split='trainval', class_choice=None, normal_channel=setup["use_normals"])
+    dset_val = PartNormalDataset(root=setup["data_dir"], npoints=setup["nb_points"],                                 split='test', class_choice=None, normal_channel=setup["use_normals"])
     parts_per_class = dset_train.parts_per_class
     classes = sorted(list(dset_train.seg_classes.keys()))
 
@@ -307,27 +315,28 @@ print('Running on ' + str(torch.cuda.current_device()))
 # Loss and Optimizer
 lr = setup["lr"]
 n_epochs = setup["epochs"]
-view_selector = ViewSelector(setup["nb_views"], selection_type=setup["selection_type"],
+mvtn = MVTN(setup["nb_views"], views_config=setup["views_config"],
                              canonical_elevation=setup["canonical_elevation"],canonical_distance= setup["canonical_distance"],
-                             shape_features_size=setup["features_size"], transform_distance=setup["transform_distance"], input_view_noise=False, light_direction=setup["light_direction"]).cuda()
-feature_extractor = FeatureExtracter(setup).cuda()
+            shape_features_size=setup["features_size"], transform_distance=setup["transform_distance"], input_view_noise=setup["input_view_noise"], shape_extractor=None, screatch_feature_extractor=False).cuda()
+mvrenderer = MVRenderer(nb_views=setup["nb_views"], image_size=setup["image_size"], pc_rendering=setup["pc_rendering"], object_color=setup["object_color"], background_color=setup["background_color"],
+                        faces_per_pixel=1, points_radius=setup["points_radius"],  points_per_pixel=setup["points_per_pixel"], light_direction=setup["light_direction"], cull_backfaces=setup["cull_backfaces"])
+
 print(setup)
 criterion = nn.CrossEntropyLoss()
 views_criterion = nn.CosineSimilarity()
 optimizer = torch.optim.AdamW(
     mvnetwork.parameters(), lr=lr, weight_decay=setup["weight_decay"])
 if setup["is_learning_views"]:
-    vs_optimizer = torch.optim.AdamW(view_selector.parameters(), lr=setup["vs_learning_rate"], weight_decay=setup["vs_weight_decay"])
+    mvtn_optimizer = torch.optim.AdamW(mvtn.parameters(), lr=setup["vs_learning_rate"], weight_decay=setup["vs_weight_decay"])
 else : 
-    vs_optimizer = None
-if setup["is_learning_points"]:
-    fe_optimizer = torch.optim.AdamW(feature_extractor.parameters(), lr=setup["pn_learning_rate"])
-else:
-    fe_optimizer = None
+    mvtn_optimizer = None
+# if setup["is_learning_points"]:
+#     fe_optimizer = torch.optim.AdamW(feature_extractor.parameters(), lr=setup["pn_learning_rate"])
+# else:
+#     fe_optimizer = None
 
 models_bag = {"mvnetwork": mvnetwork,
-              "optimizer": optimizer, "view_selector": view_selector, "vs_optimizer": vs_optimizer, "fe_optimizer": fe_optimizer,
-              "feature_extractor": feature_extractor}
+              "optimizer": optimizer, "mvtn": mvtn, "mvtn_optimizer": mvtn_optimizer,"mvrenderer":mvrenderer }
 
 
 
@@ -340,17 +349,17 @@ def train(data_loader, models_bag, setup):
     n = 0
     # torch.autograd.set_detect_anomaly(True)
 
-    for i, (targets, meshes, extra_info,correction_factor) in enumerate(data_loader):
+    for i, (targets, meshes, points) in enumerate(data_loader):
         models_bag["optimizer"].zero_grad()
         if setup["is_learning_views"]:
-            models_bag["vs_optimizer"].zero_grad()
-        if setup["is_learning_points"]:
-            models_bag["fe_optimizer"].zero_grad()
+            models_bag["mvtn_optimizer"].zero_grad()
+        # if setup["is_learning_points"]:
+        #     models_bag["fe_optimizer"].zero_grad()
 
         # inputs = np.stack(inputs, axis=1)
         # inputs = torch.from_numpy(inputs)
         rendered_images, _, azim, elev, dist = auto_render_meshes(
-            targets, meshes, extra_info,correction_factor, models_bag, setup, device=None)
+            targets, meshes, points, models_bag, setup, )
 
         targets = targets.cuda()
         targets = Variable(targets)
@@ -403,7 +412,7 @@ def train_part_seg(data_loader, models_bag, setup):
             colors = colors/torch.norm(colors, dim=-1,p=float(setup["color_normal_p"]))[..., None]
             point_set = point_set[:,:,0:3]
         rendered_images, indxs, distance_weight_maps , _, _, _ = auto_render_parts(
-            cls, None, point_set, models_bag, setup,color=colors, device=None)
+            cls, None, point_set, models_bag, setup,color=colors, )
         cls = cls.cuda()
         cls = Variable(cls)
         seg = seg.cuda()
@@ -416,7 +425,7 @@ def train_part_seg(data_loader, models_bag, setup):
 
 
         labels_2d, pix_to_face_mask = compute_image_segment_label_points(
-            point_set, batch_points_labels=seg, rendered_pix_to_point=indxs, rendered_images=rendered_images, setup=setup, device=None)
+            point_set, batch_points_labels=seg, rendered_pix_to_point=indxs, )
         labels_2d = Variable(labels_2d)
 
         rendered_images = Variable(rendered_images)
@@ -482,7 +491,7 @@ def evluate(data_loader, models_bag,  setup, is_test=False, retrieval=False):
     if retrieval:
         features_training = np.load(setup["feature_file"])	
         targets_training = np.load(setup["targets_file"])	
-        N_retrieved = 1000 if "shapenetcore" in setup["mesh_data"].lower() else len(features_training)
+        N_retrieved = 1000 if "shapenetcore" in setup["data_dir"].lower() else len(features_training)
 
         features_training = lfda.transform(features_training)	
         # print("features_training.shape [training]", features_training.shape, targets_training.shape)	
@@ -493,16 +502,16 @@ def evluate(data_loader, models_bag,  setup, is_test=False, retrieval=False):
 
     views_record = ListDict(["azim", "elev", "dist","label","view_nb","exp_id"])
     t = tqdm(enumerate(data_loader), total=len(data_loader))	
-    for i, (targets, meshes, extra_info,correction_factor) in t:
-    # for i, (targets, meshes, extra_info,correction_factor) in enumerate(data_loader):
+    for i, (targets, meshes, points) in t:
+    # for i, (targets, meshes, points) in enumerate(data_loader):
         with torch.no_grad():
             # inputs = np.stack(inputs, axis=1)
             # inputs = torch.from_numpy(inputs)
             if setup["custom_views_mode"] :
                 rendered_images, _, azim, elev, dist = auto_render_meshes_custom_views(
-                targets, meshes, extra_info,correction_factor, models_bag, setup, device=None)
+                targets, meshes, points, models_bag, setup, )
             else:
-                rendered_images, _, azim, elev, dist = auto_render_meshes(targets, meshes, extra_info,correction_factor, models_bag, setup, device=None)
+                rendered_images, _, azim, elev, dist = auto_render_meshes(targets, meshes, points, models_bag, setup, )
             targets = targets.cuda()
             targets = Variable(targets)
             # outputs = models_bag["mvnetwork"](rendered_images)[0]
@@ -591,7 +600,7 @@ def evluate_part_seg(data_loader, models_bag,  setup, is_test=False):
                 colors = colors/torch.norm(colors, dim=-1,p=float(setup["color_normal_p"]))[..., None]
                 point_set = point_set[:,:,0:3]
             rendered_images, indxs, distance_weight_maps, azim, elev, _ = auto_render_parts(
-                cls, None, point_set, models_bag, setup, color=colors, device=None)
+                cls, None, point_set, models_bag, setup, color=colors, )
             cls = cls.cuda()
             cls = Variable(cls)
             seg = seg.cuda()
@@ -603,7 +612,7 @@ def evluate_part_seg(data_loader, models_bag,  setup, is_test=False):
             parts_range += 1  # the label 0 is reserved for bacgdround
 
             # save_batch_rendered_images(distance_weight_maps[:,:,0:3,...], test_path, "distance_weight_maps.jpg",)
-            labels_2d, pix_to_face_mask  = compute_image_segment_label_points(point_set, batch_points_labels=seg, rendered_pix_to_point=indxs, rendered_images=rendered_images, setup=setup, device=None)
+            labels_2d, pix_to_face_mask  = compute_image_segment_label_points(point_set, batch_points_labels=seg, rendered_pix_to_point=indxs, )
             # print("label2d",labels_2d.shape, torch.unique(labels_2d,True),"seg.shape",seg.shape,"indxs.shape",indxs.shape)
 
 
@@ -636,12 +645,12 @@ def evluate_part_seg(data_loader, models_bag,  setup, is_test=False):
                     normal_weight_maps = dir_vec.cuda()[..., None][..., None].repeat(1,1,1,setup["image_size"],setup["image_size"]) * rendered_images
                     views_weights = torch.abs(normal_weight_maps.sum(dim=2, keepdim=True)).sum(dim=3, keepdim=True).sum(dim=4, keepdim=True)
                     views_weights = views_weights / views_weights.sum(dim=1,keepdim=True)
-
             else :
                 views_weights = torch.ones_like(azim).cuda()[..., None][..., None][..., None]
+                
             predictions_3d = lift_2D_to_3D(point_set, predictions_2d=svctomvc(feats, nb_views=setup["nb_views"]), rendered_pix_to_point=indxs, views_weights=views_weights, parts_range=parts_range, parts_nb=parts_nb, lifting_method=setup["lifting_method"])
             predictions_3d = post_process_segmentation(point_set, predictions_3d, iterations=setup["post_process_iters"],K_neighbors=setup["post_process_k"])
-            # predictions_3d = lift_2D_to_3D(point_set, predictions_2d=labels_2d, rendered_pix_to_point=indxs,views_weights=views_weights, parts_range=parts_range, parts_nb=parts_nb,lifting_method=setup["lifting_method"],  setup=setup, device=None)
+            # predictions_3d = lift_2D_to_3D(point_set, predictions_2d=labels_2d, rendered_pix_to_point=indxs,views_weights=views_weights, parts_range=parts_range, parts_nb=parts_nb,lifting_method=setup["lifting_method"],  setup=setup, )
             # if visualize :
             #     gt_images_path = os.path.join(test_path, "GT_renderings_{}.png".format(str(cls[test_indx].item())))
             #     pred_images_path = os.path.join(test_path, "GT_renderings_{}_pred.png".format(str(cls[test_indx].item())))
@@ -715,13 +724,13 @@ def compute_features(data_loader, models_bag, setup):
     target_list=[]	
     views_record = ListDict(["azim", "elev", "dist","label","view_nb","exp_id"])	
     t = tqdm(enumerate(data_loader), total=len(data_loader))	
-    for i, (targets, meshes, extra_info,correction_factor) in t:	
+    for i, (targets, meshes, points) in t:	
         with torch.no_grad():	
             # if i > 5: break	
             # inputs = np.stack(inputs, axis=1)	
             # inputs = torch.from_numpy(inputs)	
             rendered_images, _, azim, elev, dist = auto_render_meshes(	
-                targets, meshes, extra_info,correction_factor, models_bag, setup, device=None)	
+                targets, meshes, points, models_bag, setup, )	
             targets = targets.cuda()	
             targets = Variable(targets)	
             outputs, feat = models_bag["mvnetwork"](rendered_images)	
@@ -758,15 +767,15 @@ def visualize_retrieval_views(dtst, object_nbs,models_bag, setup, device):
         setup["renderings_dir"], "retrieval")
     check_folder(renderings_root_folder)
     for indx, ii in enumerate(object_nbs):
-        (targets, meshes, extra_info,correction_factor) = dtst[ii]
+        (targets, meshes, points) = dtst[ii]
         print(targets)
         cameras_path = os.path.join(
             cameras_root_folder, "{}.jpg".format(ii))
         images_path = os.path.join(
             renderings_root_folder, "{}.jpg".format(ii))
-        #extra_info = torch.from_numpy(extra_info)
-        auto_render_and_save_images_and_cameras(targets, meshes, extra_info,correction_factor, images_path=images_path,
-                                                cameras_path=cameras_path, models_bag=models_bag, setup=setup, device=None)
+        #points = torch.from_numpy(points)
+        auto_render_and_save_images_and_cameras(targets, meshes, points, images_path=images_path,
+                                                cameras_path=cameras_path, models_bag=models_bag, setup=setup, )
 
 def analyze_rendered_views(dtst, object_nbs,models_bag, setup, device):
     compiled_analysis_list = []
@@ -777,14 +786,14 @@ def analyze_rendered_views(dtst, object_nbs,models_bag, setup, device):
         setup["renderings_dir"], "retrieval")
     check_folder(renderings_root_folder)
     for indx, ii in enumerate(object_nbs):
-        (targets, meshes, extra_info,correction_factor) = dtst[ii]
+        (targets, meshes, points) = dtst[ii]
         # print(targets)
         cameras_path = os.path.join(
             cameras_root_folder, "{}.jpg".format(ii))
         images_path = os.path.join(
             renderings_root_folder, "{}.jpg".format(ii))
-        img_avg = auto_render_and_analyze_images(targets, meshes, extra_info,correction_factor, images_path=images_path,
-                                                cameras_path=cameras_path, models_bag=models_bag, setup=setup, device=None)
+        img_avg = auto_render_and_analyze_images(targets, meshes, points, images_path=images_path,
+                                                 models_bag=models_bag, setup=setup, )
         compiled_analysis_list.append(img_avg)
     return compiled_analysis_list
     
@@ -804,14 +813,14 @@ if setup["train_only"] :
         print('Epoch: [%d/%d]' % (epoch+1, n_epochs))
         start = time.time()
         models_bag["mvnetwork"].train()
-        models_bag["view_selector"].train()
-        models_bag["feature_extractor"].train()
+        models_bag["mvtn"].train()
+        # models_bag["feature_extractor"].train()
         avg_train_acc, avg_train_loss = train(train_loader, models_bag, setup)
         print('Time taken: %.2f sec.' % (time.time() - start))
 
         models_bag["mvnetwork"].eval()
-        models_bag["view_selector"].eval()
-        models_bag["feature_extractor"].eval()
+        models_bag["mvtn"].eval()
+        # models_bag["feature_extractor"].eval()
         avg_test_acc, avg_loss, views_record = evluate(
             val_loader, models_bag, setup)
 
@@ -832,13 +841,13 @@ if setup["train_only"] :
         # util.logEpoch(logger, mvnetwork, epoch + 1, avg_loss, avg_test_acc) #############################################
         saveables = {'epoch': epoch + 1,
                      'state_dict': models_bag["mvnetwork"].state_dict(),
-                     "view_selector": models_bag["view_selector"].state_dict(),
-                     "feature_extractor": models_bag["feature_extractor"].state_dict(),
+                     "mvtn": models_bag["mvtn"].state_dict(),
+                    #  "feature_extractor": models_bag["feature_extractor"].state_dict(),
                     'acc': avg_test_acc,
                     'best_acc': setup["best_acc"],
                      'optimizer': models_bag["optimizer"].state_dict(),
-                     'vs_optimizer': None if not setup["is_learning_views"] else models_bag["vs_optimizer"].state_dict(),
-                     'fe_optimizer': None if not setup["is_learning_points"] else models_bag["fe_optimizer"].state_dict(),
+                     'mvtn_optimizer': None if not setup["is_learning_views"] else models_bag["mvtn_optimizer"].state_dict(),
+                    #  'fe_optimizer': None if not setup["is_learning_points"] else models_bag["fe_optimizer"].state_dict(),
                     }
         if setup["save_all"]:
             save_checkpoint(saveables, setup, views_record,setup["weights_file"])
@@ -859,7 +868,7 @@ if setup["train_only"] :
             print('Learning rate:', lr)
         if (epoch + 1) % setup["plot_freq"] == 0:
             for indx,ii in enumerate( PLOT_SAMPLE_NBS):
-                (targets, meshes, extra_info,correction_factor) = dset_val[ii]
+                (targets, meshes, points) = dset_val[ii]
                 cameras_root_folder = os.path.join(setup["cameras_dir"],str(indx))
                 check_folder(cameras_root_folder)
                 renderings_root_folder = os.path.join(setup["renderings_dir"], str(indx))
@@ -868,16 +877,16 @@ if setup["train_only"] :
                     cameras_root_folder, "MV_cameras_{}.jpg".format(str(epoch + 1)))
                 images_path = os.path.join(
                     renderings_root_folder, "MV_renderings_{}.jpg".format(str(epoch + 1)))
-                #extra_info = torch.from_numpy(extra_info)
-                auto_render_and_save_images_and_cameras(targets, meshes, extra_info,correction_factor, images_path=images_path,
-                                                        cameras_path=cameras_path, models_bag=models_bag, setup=setup, device=None)
+                #points = torch.from_numpy(points)
+                auto_render_and_save_images_and_cameras(targets, meshes, points, images_path=images_path,
+                                                        cameras_path=cameras_path, models_bag=models_bag, setup=setup, )
     if setup["log_metrics"]:
         writer.add_hparams(setup, {"hparams/best_acc": setup["best_acc"]})
 if setup["test_only"]:
     print('\nEvaluation:')
     models_bag["mvnetwork"].eval()
-    models_bag["view_selector"].eval()
-    models_bag["feature_extractor"].eval()
+    models_bag["mvtn"].eval()
+    # models_bag["feature_extractor"].eval()
 
     # avg_train_acc, avg_train_loss = evluate(train_loader, models_bag, setup)
     # print('\ttrain Acc: %.2f - val Loss: %.4f' %(avg_train_acc.item(), avg_train_loss.item()))
@@ -887,7 +896,7 @@ if setup["test_only"]:
           (avg_test_acc.item(), avg_test_loss.item()))
     print('\tCurrent best val acc: %.2f' % setup["best_acc"])
     for indx, ii in enumerate(PLOT_SAMPLE_NBS):
-        (targets, meshes, extra_info,correction_factor) = dset_val[ii]
+        (targets, meshes, points) = dset_val[ii]
         cameras_root_folder = os.path.join(setup["cameras_dir"],str(indx))
         check_folder(cameras_root_folder)
         renderings_root_folder = os.path.join(setup["renderings_dir"], str(indx))
@@ -895,14 +904,14 @@ if setup["test_only"]:
         cameras_path = os.path.join(cameras_root_folder,
             "MV_cameras_{}.jpg".format("test"))
         images_path = os.path.join(renderings_root_folder, "MV_renderings_{}.jpg".format("test"))
-        # extra_info = torch.from_numpy(extra_info)
-        auto_render_and_save_images_and_cameras(targets, meshes, extra_info,correction_factor, images_path=images_path,
-                                                cameras_path=cameras_path, models_bag=models_bag, setup=setup, device=None)
+        # points = torch.from_numpy(points)
+        auto_render_and_save_images_and_cameras(targets, meshes, points, images_path=images_path,
+                                                cameras_path=cameras_path, models_bag=models_bag, setup=setup, )
 if setup["test_retrieval_only"]:
     print('\nEvaluation:')
     models_bag["mvnetwork"].eval()
-    models_bag["view_selector"].eval()
-    models_bag["feature_extractor"].eval()
+    models_bag["mvtn"].eval()
+    # models_bag["feature_extractor"].eval()
 
     # extract features for training (if does not exist yet)
     os.makedirs(os.path.dirname(setup["feature_file"]),exist_ok=True)
@@ -947,8 +956,8 @@ elif setup["part_seg_mode"]:
         start = time.time()
         if not setup["test_part_seg_only"]:
             models_bag["mvnetwork"].train()
-            models_bag["view_selector"].train()
-            models_bag["feature_extractor"].train()
+            models_bag["mvtn"].train()
+            # models_bag["feature_extractor"].train()
             avg_train_acc, avg_train_loss = train_part_seg(train_loader, models_bag, setup)
             print('Time taken: %.2f sec.' % (time.time() - start))
             print('\ttrain pixel acc: %.2f - train 2D Loss: %.4f ' %(avg_train_acc, avg_train_loss))
@@ -958,8 +967,8 @@ elif setup["part_seg_mode"]:
         else:
             is_test = True
         models_bag["mvnetwork"].eval()
-        models_bag["view_selector"].eval()
-        models_bag["feature_extractor"].eval()
+        models_bag["mvtn"].eval()
+        # models_bag["feature_extractor"].eval()
         avg_test_acc, mean_cat_iou_test, mean_inst_iou_test, avg_loss, point_coverage = evluate_part_seg(
             val_loader, models_bag, setup, is_test=is_test)
         print('\nEvaluation:')
@@ -977,8 +986,8 @@ elif setup["part_seg_mode"]:
 
         saveables = {'epoch': epoch + 1,
                      'state_dict': models_bag["mvnetwork"].state_dict(),
-                     "view_selector": models_bag["view_selector"].state_dict(),
-                     "feature_extractor": models_bag["feature_extractor"].state_dict(),
+                     "mvtn": models_bag["mvtn"].state_dict(),
+                    #  "feature_extractor": models_bag["feature_extractor"].state_dict(),
                      'acc': avg_test_acc,
                      'best_acc': setup["best_acc"],
                      'best_inst_iou': setup["best_inst_iou"],
@@ -1031,8 +1040,8 @@ elif setup["part_seg_mode"]:
                 check_folder(renderings_root_folder)
 
                 rendered_images, indxs, distance_weight_maps, azim, elev, _ = auto_render_parts(
-                    cls, None, point_set, models_bag, setup,color=colors, device=None)
-                labels_2d, pix_to_face_mask  = compute_image_segment_label_points(point_set, batch_points_labels=seg, rendered_pix_to_point=indxs, rendered_images=rendered_images, setup=setup, device=None)
+                    cls, None, point_set, models_bag, setup,color=colors, )
+                labels_2d, pix_to_face_mask  = compute_image_segment_label_points(point_set, batch_points_labels=seg, rendered_pix_to_point=indxs, )
 
 
                 outputs = models_bag["mvnetwork"](rendered_images)
@@ -1046,19 +1055,28 @@ elif setup["part_seg_mode"]:
                     feats = outputs.data
                 _, predicted = torch.max(feats, dim=1)
 
-                if setup["lifting_method"] == "attention":
+                if "attention" in setup["lifting_method"]:
                     dir_vec = torch_direction_vector(batch_tensor(azim, dim=1, squeeze=True), batch_tensor(elev, dim=1, squeeze=True))
                     dir_vec = unbatch_tensor(dir_vec, dim=1, unsqueeze=True, batch_size=bs)
-                    points_weights = torch.abs(torch.bmm(dir_vec.cuda(),normals.transpose(1,2).cuda()))
-                    views_weights = points_weights.sum(dim=-1)
-                    views_weights = views_weights/views_weights.sum(dim=-1)[...,None] 
+                    if setup["lifting_method"] == "point_attention":
+                        points_weights = torch.abs(torch.bmm(dir_vec.cuda(),normals.transpose(1,2).cuda()))
+                        views_weights = points_weights.sum(dim=-1)
+                        views_weights = views_weights / views_weights.sum(dim=-1,keepdim=True)
+                        views_weights = views_weights[..., None][..., None][..., None]
+                    elif setup["lifting_method"] == "pixel_attention":
+                        normal_weight_maps = dir_vec.cuda()[..., None][..., None].repeat(1,1,1,setup["image_size"],setup["image_size"]) * rendered_images
+                        views_weights = torch.abs(normal_weight_maps.sum(dim=2, keepdim=True))
+                    elif setup["lifting_method"] == "view_attention":
+                        normal_weight_maps = dir_vec.cuda()[..., None][..., None].repeat(1,1,1,setup["image_size"],setup["image_size"]) * rendered_images
+                        views_weights = torch.abs(normal_weight_maps.sum(dim=2, keepdim=True)).sum(dim=3, keepdim=True).sum(dim=4, keepdim=True)
+                        views_weights = views_weights / views_weights.sum(dim=1,keepdim=True)
                 else :
-                    views_weights = torch.ones_like(azim).cuda()
+                    views_weights = torch.ones_like(azim).cuda()[..., None][..., None][..., None]
 
                 predictions_3d = lift_2D_to_3D(point_set, predictions_2d=svctomvc(feats, nb_views=setup["nb_views"]), rendered_pix_to_point=indxs,views_weights=views_weights, parts_range=parts_range, parts_nb=parts_nb,lifting_method=setup["lifting_method"])
                 predictions_3d = post_process_segmentation(
                     point_set, predictions_3d, iterations=setup["post_process_iters"], K_neighbors=setup["post_process_k"])
-                predictions_3d_projected ,_= compute_image_segment_label_points(point_set, batch_points_labels=predictions_3d.to(torch.int), rendered_pix_to_point=indxs, rendered_images=rendered_images, setup=setup, device=None)
+                predictions_3d_projected ,_= compute_image_segment_label_points(point_set, batch_points_labels=predictions_3d.to(torch.int), rendered_pix_to_point=indxs, )
                 save_batch_rendered_segmentation_images(labels_2d, renderings_root_folder, "GT_renderings_{}.jpg".format(str(epoch + 1)),)
                 save_batch_rendered_segmentation_images(svtomv(
                     predicted, nb_views=setup["nb_views"])* (~pix_to_face_mask).to(torch.long)[:,:,0,...],
@@ -1118,10 +1136,10 @@ elif setup["scene_seg_mode"]:
     check_folder(renderings_root_folder)
 
     rendered_images, indxs, distance_weight_maps, _,_,_ = auto_render_parts(
-        cls, None, point_set, models_bag, setup, color=colors, device=None)
+        cls, None, point_set, models_bag, setup, color=colors, )
     save_batch_rendered_images(rendered_images[:, :, 0:3, ...].to(torch.int), renderings_root_folder, "original_renderings_{}.jpg".format(str(epoch + 1)),)
 
-    labels_2d, pix_to_face_mask  = compute_image_segment_label_points(point_set, batch_points_labels=seg, rendered_pix_to_point=indxs, rendered_images=rendered_images, setup=setup, device=None)
+    labels_2d, pix_to_face_mask  = compute_image_segment_label_points(point_set, batch_points_labels=seg, rendered_pix_to_point=indxs, )
     save_batch_rendered_segmentation_images(labels_2d, renderings_root_folder, "GT_renderings_{}.jpg".format(str(epoch + 1)),)
 
 

@@ -37,11 +37,19 @@ pip install einops
 
 ## Usage
 
-The main Python script in the root directorty `mvt_cls.py`. 
+The main Python script in the root directorty `mvtn_run.py`. 
 
-First download the data folder from [this link](https://drive.google.com/drive/folders/1CcaD2zWfRPYom05Goi4PTlpt-VHkpYph?usp=sharing) and unzip its content (ModelNet objects meshes are simplified to fit the GPU ). Then you can run MVTN with 
+First download the datasets and unzip inside the `data/` directories as follows: 
+
+- ModelNet40 [this link](https://drive.google.com/file/d/157W0qYR2yQAc5qKmXlZuHms66wmUM8Hi/view?usp=sharing) (ModelNet objects meshes are simplified to fit the GPU and allows for backpropogation ). 
+
+- ShapeNet Core55 v2 [this link](https://shapenet.org/download/shapenetcore) ( You need to create an account) 
+
+- ScanObjectNN [this link](https://drive.google.com/file/d/15xhYA8SC5EdLKZA_xV0FXyRy8f-qGMs5/view?usp=sharing) (ScanObjectNN with its three main variants [`obj_only` ,`with_bg` , `hardest`] controlled by the `--dset_variant` option  ). 
+
+Then you can run MVTN with 
 ```
-python mvt_cls.py --epochs 100 --nb_views 4 --batch-size 4 --selection_type canonical --image_data data/view/classes/ --mesh_data data/ModelNet40/ --simplified_mesh --pretrained --resume  --learning_rate 0.0001
+python mvtn_run.py --epochs 100 --nb_views 4 --batch-size 4 --selection_type canonical --data_dir data/ModelNet40/ --simplified_mesh --pretrained --resume  --learning_rate 0.0001
 ```
 - `--selection_type` is one of six view selections :  choices=("circular", "random", "spherical" "learned_circular" , "learned_spherical" , "learned_direct")
 - `--resume` continue training from last checkpoint.
@@ -52,12 +60,14 @@ python mvt_cls.py --epochs 100 --nb_views 4 --batch-size 4 --selection_type cano
 - `--pc_rendering` : a Flag if you want to use point clouds instead of mesh data and point cloud rendering instead of mesh rendering. This is the default when only point cloud data is available ( like in ScanObjectNN dataset)
 Other parameters can be founded in the script, or run `python mvt_cls.py -h`. The default parameters are the ones used in the paper.
 
-The results will be saved in `cameras/` folder for the camera view points and the renderings of some example are saved in `renderings/`.
+The results will be saved in `results/00/0001/` folder that canotina the camera view points and the renderings of some example as well the checkpoints and the logs.
 <br>
+
 The `ViewSelector` object in `ops.py` is the main class in this work .. it has options "random" , "canonical" and "learned" ... 
 
 ## Other files
-- `results/` folder saves the results (accuracies, images, and checkpoints) 
+- `models/renderer.py` contains the main Pytorch3D  differentiable renderer class that can render multi-view images for point clouds and meshes adaptively.
+- `models/mvtn.py` contains a standalone class for MVTN that can be used with any other pipeline.
 - `custom_dataset.py` includes all the pytorch dataloaders for 3D datasets: ModelNEt40, SahpeNet core55 ,ScanObjectNN, and ShapeNet Parts 
 - `blender_simplify.py` is the Blender code used to simplify the meshes with `simplify_mesh` function from `util.py` as the   following :  
 ```python 
@@ -68,7 +78,6 @@ mymesh, reduced_mesh = simplify_mesh(input_mesh_file,simplify_ratio=simplify_rat
 The output simplified mesh will be saved in the same directory of the original mesh with "SMPLER" appended to the name
 
 ## Misc
-- The aligned version of ModelNet40 data (in point cloud data format) can be downloaded [here](https://drive.google.com/open?id=1m7BmdtX1vWrpl9WRX5Ds2qnIeJHKmE36).
 - Please open an issue or contact Abdullah Hamdi (abdullah.hamdi@kaust.edu.sa) if there is any question.
 
 ## Acknoledgements

@@ -137,8 +137,8 @@ parser.add_argument('--return_points_sampled', dest='return_points_sampled',
                     action='store_true', help='reuturn 3d point clouds from the data loader sampled from hte mesh ')
 parser.add_argument('--return_points_saved', dest='return_points_saved',
                     action='store_true', help='reuturn 3d point clouds from the data loader saved under `filePOINTS.pkl` ')
-parser.add_argument('--return_extracted_features', dest='return_extracted_features',
-                    action='store_true', help='return pre extracted features `*_PFeatures.pt` for each 3d model from the dataloader ')
+# parser.add_argument('--return_extracted_features', dest='return_extracted_features',
+#                     action='store_true', help='return pre extracted features `*_PFeatures.pt` for each 3d model from the dataloader ')
 parser.add_argument('--rotated_test', dest='rotated_test',
                     action='store_true', help=' test on rotation noise on the meshes from ModelNet40 to make it realistic  ')
 parser.add_argument('--rotated_train', dest='rotated_train',
@@ -269,10 +269,10 @@ models_bag["fe_optimizer"] = fe_optimizer
 def view_gcn_exp(setup, models_bag):
     seed_torch()
     if "modelnet" in setup["mesh_data"].lower():
-        dset_train = ThreeMultiViewDataSet(
-            'train', setup, transform=None, is_rotated=setup["rotated_train"])
-        dset_val = ThreeMultiViewDataSet(
-            'test', setup, transform=None, is_rotated=setup["rotated_test"])
+        dset_train = ShapeNetCore(setup["mesh_data"], ("train",), setup["nb_points"], load_textures=False,
+                                  dset_norm=setup["dset_norm"], simplified_mesh=setup["simplified_mesh"])
+        dset_val = ShapeNetCore(setup["mesh_data"], ("test",), setup["nb_points"], load_textures=False,
+                                dset_norm=setup["dset_norm"], simplified_mesh=setup["simplified_mesh"])
         classes = dset_train.classes
 
 
