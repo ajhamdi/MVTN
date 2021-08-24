@@ -58,6 +58,7 @@ python run_mvtn.py --data_dir data/ModelNet40/ --run_mode train --mvnetwork mvcn
 - `--resume` a flag to continue training from last checkpoint.
 - `--pc_rendering` : a flag if you want to use point clouds instead of mesh data and point cloud rendering instead of mesh rendering. This should be default when only point cloud data is available ( like in ScanObjectNN dataset)
 - `--object_color`: is the uniform color of the mesh or object rendered. default="white", choices=["white", "random", "black", "red", "green", "blue", "custom"]
+
 Other parameters can be founded in `config.yaml` configuration file or run `python run_mvtn.py -h`. The default parameters are the ones used in the paper.
 
 The results will be saved in `results/00/0001/` folder that contaions the camera view points and the renderings of some example as well the checkpoints and the logs.
