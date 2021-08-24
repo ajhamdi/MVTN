@@ -37,7 +37,7 @@ pip install einops
 
 ## Usage
 
-The main Python script in the root directorty `mvtn_run.py`. 
+The main Python script in the root directorty `run_mvtn.py`. 
 
 First download the datasets and unzip inside the `data/` directories as follows: 
 
@@ -49,9 +49,10 @@ First download the datasets and unzip inside the `data/` directories as follows:
 
 Then you can run MVTN with 
 ```
-python mvtn_run.py --epochs 100 --nb_views 4 --batch-size 4 --selection_type canonical --data_dir data/ModelNet40/ --simplified_mesh --pretrained --resume  --learning_rate 0.0001
+python run_mvtn.py --data_dir data/ModelNet40/ --run_mode train --nb_views 8 --views_config circular 
 ```
-- `--selection_type` is one of six view selections :  choices=("circular", "random", "spherical" "learned_circular" , "learned_spherical" , "learned_direct")
+- `--run_mode` is the run mode. choices: "train"(train pipeline), "test_cls"(test classification after training), "test_retr"(test retrieval after training), "test_rot"(test rotation robustness after training), "test_occ"(test occlusion robustness after training)
+- `--views_config` is one of six view selections :  choices=("circular", "random", "spherical" "learned_circular" , "learned_spherical" , "learned_direct")
 - `--resume` continue training from last checkpoint.
 - `--pretrained` use ImageNet pretrained networks in the CNN
 - `--image_data` the folder for prerendered images ( not needed really ).
@@ -63,7 +64,7 @@ Other parameters can be founded in the script, or run `python mvt_cls.py -h`. Th
 The results will be saved in `results/00/0001/` folder that canotina the camera view points and the renderings of some example as well the checkpoints and the logs.
 <br>
 
-The `ViewSelector` object in `ops.py` is the main class in this work .. it has options "random" , "canonical" and "learned" ... 
+The `ViewSelector` object in `ops.py` is the main class in this work .. it has options "random" , "circular" and "learned" ... 
 
 ## Other files
 - `models/renderer.py` contains the main Pytorch3D  differentiable renderer class that can render multi-view images for point clouds and meshes adaptively.
