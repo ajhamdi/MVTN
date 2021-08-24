@@ -55,8 +55,8 @@ python run_mvtn.py --data_dir data/ModelNet40/ --run_mode train --mvnetwork mvcn
 - `--run_mode` is the run mode. choices: "train"(train for classification), "test_cls"(test classification after training), "test_retr"(test retrieval after training), "test_rot"(test rotation robustness after training), "test_occ"(test occlusion robustness after training)
 - `--mvnetwork` is the multi-view network used in the pipeline. Choices: "[mvcnn](https://github.com/RBirkeland/MVCNN-PyTorch)" , "[rotnet](https://github.com/kanezaki/pytorch-rotationnet)", "[viewgcn](https://github.com/weixmath/view-GCN)"
 - `--views_config` is one of six view selection methods that are either learned or heuristics :  choices: "circular", "random", "spherical" "learned_circular" , "learned_spherical" , "learned_direct". Only the ones that are learned are MVTN variants.
-- `--resume` continue training from last checkpoint.
-- `--pc_rendering` : a Flag if you want to use point clouds instead of mesh data and point cloud rendering instead of mesh rendering. This should be default when only point cloud data is available ( like in ScanObjectNN dataset)
+- `--resume` a flag to continue training from last checkpoint.
+- `--pc_rendering` : a flag if you want to use point clouds instead of mesh data and point cloud rendering instead of mesh rendering. This should be default when only point cloud data is available ( like in ScanObjectNN dataset)
 - `--object_color`: is the uniform color of the mesh or object rendered. default="white", choices=["white", "random", "black", "red", "green", "blue", "custom"]
 Other parameters can be founded in `config.yaml` configuration file or run `python run_mvtn.py -h`. The default parameters are the ones used in the paper.
 
