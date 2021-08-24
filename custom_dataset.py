@@ -13,22 +13,14 @@ import torch
 from PIL import Image
 from util import torch_center_and_normalize, sort_jointly, load_obj, load_text
 from torch._six import container_abcs, string_classes, int_classes
-# from torch_geometric.io import read_off, read_obj
+
 import trimesh
 import math
 from pytorch3d.structures import Meshes
 from pytorch3d.renderer.mesh import Textures
 
-# 3D transformations functions
-# from pytorch3d.transforms import Rotate, Translate
 
-# rendering components
-# from pytorch3d.renderer import (
-#     OpenGLPerspectiveCameras, look_at_view_transform, look_at_rotation,
-#     RasterizationSettings, MeshRenderer, MeshRasterizer, BlendParams,
-#     SoftSilhouetteShader, HardPhongShader, PointLights)
-
-def  rotation_matrix(axis, theta, in_degrees=True):
+def rotation_matrix(axis, theta, in_degrees=True):
     """
     Return the rotation matrix associated with counterclockwise rotation about
     the given axis by theta radians.
@@ -44,52 +36,6 @@ def  rotation_matrix(axis, theta, in_degrees=True):
     return np.array([[aa + bb - cc - dd, 2 * (bc + ad), 2 * (bd - ac)],
                      [2 * (bc - ad), aa + cc - bb - dd, 2 * (cd + ab)],
                      [2 * (bd + ac), 2 * (cd - ab), aa + dd - bb - cc]])
-# class MultiViewDataSet(Dataset):
-
-#     def find_classes(self, dir):
-#         classes = [d for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d))]
-#         classes.sort()
-#         class_to_idx = {classes[i]: i for i in range(len(classes))}
-
-#         return classes, class_to_idx
-
-#     def __init__(self, root, split, transform=None, target_transform=None):
-#         self.x = []
-#         self.y = []
-#         self.root = root
-
-#         self.classes, self.class_to_idx = self.find_classes(root)
-
-#         self.transform = transform
-#         self.target_transform = target_transform
-
-#         # root / <label>  / <train/test> / <item> / <view>.png
-#         for label in os.listdir(root): # Label
-#             for item in os.listdir(root + '/' + label + '/' + split):
-#                 views = []
-#                 for view in os.listdir(root + '/' + label + '/' + split + '/' + item):
-#                     views.append(root + '/' + label + '/' + split + '/' + item + '/' + view)
-
-#                 self.x.append(views)
-#                 self.y.append(self.class_to_idx[label])
-
-#     # Override to give PyTorch access to any image on the dataset
-#     def __getitem__(self, index):
-#         orginal_views = self.x[index]
-#         views = []
-
-#         for view in orginal_views:
-#             im = Image.open(view)
-#             im = im.convert('RGB')
-#             if self.transform is not None:
-#                 im = self.transform(im)
-#             views.append(im)
-
-#         return views, self.y[index]
-
-#     # Override to give PyTorch size of dataset
-#     def __len__(self):
-#         return len(self.x)
 
 
 class ModelNet40(Dataset):
@@ -103,108 +49,80 @@ class ModelNet40(Dataset):
         return classes, class_to_idx
 
     def __init__(self, data_dir, split, nb_points=2048, simplified_mesh=False, cleaned_mesh=False, dset_norm=2, return_points_saved=False, is_rotated=False):
-        # self.x = []
+
         self.y = []
-        self.data_list =[]
-        self.split = split # train/test
+        self.data_list = []
+        self.split = split
         self.nb_points = nb_points
-        # self.root_2D = setup["image_data"]
+
         self.data_dir = data_dir
-        self.simplified_mesh = simplified_mesh # simplified version of ModelNet40 meshes 
-        self.cleaned_mesh = cleaned_mesh  # corrected version of ModelNet40 meshes by flipping the faces normals of some objects.
+        self.simplified_mesh = simplified_mesh
+        self.cleaned_mesh = cleaned_mesh
         self.dset_norm = dset_norm
         self.return_points_sampled = not return_points_saved
         self.return_points_saved = return_points_saved
-        self.initial_angle = -90 # correcting the pose of the meshes by -90 degrees around the x-axis
-
-        # self.return_extracted_features = setup["return_extracted_features"]
-        # self.features_type = setup["features_type"]
+        self.initial_angle = -90
 
         self.classes, self.class_to_idx = self.find_classes(self.data_dir)
 
-        # self.transform = transform
         self.is_rotated = is_rotated
 
-        # root / <label>  / <train/test> / <item> / <view>.png
-        for label in os.listdir(self.data_dir):  # Label
+        for label in os.listdir(self.data_dir):
             for item in os.listdir(self.data_dir + '/' + label + '/' + self.split):
-                # views = []
-                # for view in os.listdir(self.data_dir + '/' + label + '/' + self.split + '/' + item):
-                    # views.append(self.data_dir + '/' + label + '/' +
-                    #              self.split + '/' + item + '/' + view)
 
-                # self.x.append(views)
                 if item.endswith(".off"):
                     self.y.append(self.class_to_idx[label])
-                    self.data_list.append(self.data_dir + '/' + label + '/' + self.split + '/' + item)
+                    self.data_list.append(
+                        self.data_dir + '/' + label + '/' + self.split + '/' + item)
 
         self.simplified_data_list = [file_name.replace(
-            ".off", "_SMPLER.obj") for file_name in self.data_list if file_name[-4::]==".off"]
-        # self.cleaned_data_list = [file_name.replace(
-        #     ".off", "_RMV.obj") for file_name in self.data_list if file_name[-4::]==".off"]
-        # self.extracted_features_list = [file_name.replace(".off", "_PFeautres.pkl") for file_name in self.data_list if file_name[-4::] == ".off"]
-        self.points_list = [file_name.replace(".off", "POINTS.pkl") for file_name in self.data_list if file_name[-4::] == ".off"]
+            ".off", "_SMPLER.obj") for file_name in self.data_list if file_name[-4::] == ".off"]
+
+        self.points_list = [file_name.replace(
+            ".off", "POINTS.pkl") for file_name in self.data_list if file_name[-4::] == ".off"]
         self.data_list, self.simplified_data_list, self.y, self.points_list = sort_jointly(
             [self.data_list, self.simplified_data_list, self.y, self.points_list], dim=0)
         if self.is_rotated:
-            df = pd.read_csv(os.path.join(self.data_dir,"..", "rotated_modelnet_{}.csv".format(self.split)), sep=",")
-            self.rotations_list = [df[df.mesh_path.isin([x])].to_dict("list") for x in self.data_list]
-        
+            df = pd.read_csv(os.path.join(
+                self.data_dir, "..", "rotated_modelnet_{}.csv".format(self.split)), sep=",")
+            self.rotations_list = [df[df.mesh_path.isin([x])].to_dict(
+                "list") for x in self.data_list]
+
         self.correction_factors = [1]*len(self.data_list)
         if self.cleaned_mesh:
-            fault_mesh_list = load_text(os.path.join(self.data_dir, "..", "{}_faults.txt".format(self.split)))
+            fault_mesh_list = load_text(os.path.join(
+                self.data_dir, "..", "{}_faults.txt".format(self.split)))
             fault_mesh_list = [int(x) for x in fault_mesh_list]
             for x in fault_mesh_list:
                 self.correction_factors[x] = -1
-        
-            # print("@@@@@@@@@@@", self.rotations_list[0], self.data_list[0])
 
-
-    # Override to give PyTorch access to any image on the dataset
     def __getitem__(self, index):
-        # orginal_views = self.x[index]
-        # views = []
 
-        # for view in orginal_views:
-        #     im = Image.open(view)
-        #     im = im.convert('RGB')
-        #     if self.transform is not None:
-        #         im = self.transform(im)
-        #     views.append(im)
-        if not self.simplified_mesh :
+        if not self.simplified_mesh:
             threeobject = trimesh.load(self.data_list[index])
-            # threeobject = read_off(self.data_list[index])
-            # verts = threeobject.pos.numpy()
-            # faces = threeobject.face.transpose(0, 1).numpy()
+
         else:
             threeobject = trimesh.load(self.simplified_data_list[index])
-        
 
         if not self.is_rotated:
             angle = self.initial_angle
             rot_axis = [1, 0, 0]
-        else :
+        else:
             angle = self.rotations_list[index]["rot_theta"][0]
             rot_axis = [self.rotations_list[index]["rot_x"]
                         [0], self.rotations_list[index]["rot_y"][0], self.rotations_list[index]["rot_z"][0]]
 
         verts = np.array(threeobject.vertices.data.tolist())
         faces = np.array(threeobject.faces.data.tolist())
-        if self.correction_factors[index] == -1 and self.cleaned_mesh and self.simplified_mesh: # flip the faces 
-            faces[:,0] , faces[:,2] = faces[:,2] , faces[:,0]
+        if self.correction_factors[index] == -1 and self.cleaned_mesh and self.simplified_mesh:
+            faces[:, 0], faces[:, 2] = faces[:, 2], faces[:, 0]
 
         verts = rotation_matrix(rot_axis, angle).dot(verts.T).T
         verts = torch_center_and_normalize(torch.from_numpy(
             verts).to(torch.float), p=self.dset_norm)
         faces = torch.from_numpy(faces)
 
-        # if True:
-        #     faces[ :, 1], faces[ :, 2] = faces[ :, 2], faces[ :, 1]
-
-
-
-        # Initialize each vertex to be white in color.
-        verts_rgb = torch.ones_like(verts)[None]  # (1, V, 3)
+        verts_rgb = torch.ones_like(verts)[None]
         textures = Textures(verts_rgb=verts_rgb)
         mesh = Meshes(
             verts=[verts],
@@ -215,34 +133,16 @@ class ModelNet40(Dataset):
         if self.return_points_sampled or self.return_points_saved:
             if self.return_points_sampled:
                 points = threeobject.sample(self.nb_points, False)
-            else :
+            else:
                 points = load_obj(self.points_list[index])
-            points = torch.from_numpy(rotation_matrix(rot_axis, angle).dot(points.T).T).to(torch.float)
+            points = torch.from_numpy(rotation_matrix(
+                rot_axis, angle).dot(points.T).T).to(torch.float)
             points = torch_center_and_normalize(points, p=self.dset_norm)
-            # if self.split =="train":
-            #     points = torch_augment_pointcloud(points)
-        return self.y[index], mesh, points #, self.correction_factors[index]
-        # elif self.return_extracted_features:
-        #     features = load_obj(self.extracted_features_list[index])
-        #     if self.features_type == "logits_trans":
-        #         features = np.concatenate((features["logits"].reshape(-1), features["transform_matrix"].reshape(-1)),0)
-        #     elif self.features_type == "post_max_trans":
-        #         features = np.concatenate(
-        #             (features["post_max"].reshape(-1), features["transform_matrix"].reshape(-1)), 0)
-        #     else :
-        #         features = features[self.features_type].reshape(-1)
 
-        #     # if self.split =="train":
-        #     #     points = torch_augment_pointcloud(points)
-        #     # print(features[self.features_type].shape)
-        #     return self.y[index], mesh, features, self.correction_factors[index]
-        # else :
-        #     return self.y[index], mesh, None #, self.correction_factors[index]
+        return self.y[index], mesh, points
 
-    # Override to give PyTorch size of dataset
     def __len__(self):
         return len(self.y)
-
 
 
 def collate_fn(batch):
@@ -253,8 +153,7 @@ def collate_fn(batch):
     if isinstance(elem, torch.Tensor):
         out = None
         if torch.utils.data.get_worker_info() is not None:
-            # If we're in a background process, concatenate directly into a
-            # shared memory tensor to avoid an extra copy
+
             numel = sum([x.numel() for x in batch])
             storage = elem.storage()._new_shared(numel)
             out = elem.new(storage)
@@ -265,7 +164,7 @@ def collate_fn(batch):
             and elem_type.__name__ != 'string_':
         if elem_type.__name__ == 'ndarray' or elem_type.__name__ == 'memmap':
             return collate_fn([torch.as_tensor(b) for b in batch])
-        elif elem.shape == ():  # scalars
+        elif elem.shape == ():
             return torch.as_tensor(batch)
     elif isinstance(elem, float):
         return torch.tensor(batch, dtype=torch.float64)
@@ -275,10 +174,10 @@ def collate_fn(batch):
         return batch
     elif isinstance(elem, container_abcs.Mapping):
         return {key: collate_fn([d[key] for d in batch]) for key in elem}
-    elif isinstance(elem, tuple) and hasattr(elem, '_fields'):  # namedtuple
+    elif isinstance(elem, tuple) and hasattr(elem, '_fields'):
         return elem_type(*(collate_fn(samples) for samples in zip(*batch)))
     elif isinstance(elem, container_abcs.Sequence):
-        # check to make sure that the elements in batch have consistent size
+
         it = iter(batch)
         elem_size = len(next(it))
         if not all(len(elem) == elem_size for elem in it):
@@ -358,8 +257,7 @@ class ShapeNetBase(torch.utils.data.Dataset):
         )
         if self.load_textures:
             textures = aux.texture_atlas
-            # Some meshes don't have textures. In this case
-            # create a white texture map
+
         else:
             textures = verts.new_ones(
                 faces.verts_idx.shape[0],
@@ -370,7 +268,7 @@ class ShapeNetBase(torch.utils.data.Dataset):
 
         return verts, faces.verts_idx, textures
 
-  
+
 class ShapeNetCore(ShapeNetBase):
     """
     This class loads ShapeNetCore from a given directory into a Dataset object.
@@ -428,18 +326,15 @@ class ShapeNetCore(ShapeNetBase):
         splits = pd.read_csv(os.path.join(
             self.shapenet_dir, "shapenet_split.csv"), sep=",", dtype=str)
 
-        # Synset dictionary mapping synset offsets to corresponding labels.
         dict_file = "shapenet_synset_dict_v%d.json" % version
         with open(path.join(self.shapenet_dir, dict_file), "r") as read_dict:
             self.synset_dict = json.load(read_dict)
-        # Inverse dicitonary mapping synset labels to corresponding offsets.
+
         self.synset_inv = {label: offset for offset,
                            label in self.synset_dict.items()}
 
-        # If categories are specified, check if each category is in the form of either
-        # synset offset or synset label, and if the category exists in the given directory.
         if synsets is not None:
-            # Set of categories to load in the form of synset offsets.
+
             synset_set = set()
             for synset in synsets:
                 if (synset in self.synset_dict.keys()) and (
@@ -456,8 +351,7 @@ class ShapeNetCore(ShapeNetBase):
                         "or cannot be found in %s."
                     ) % (synset, data_dir)
                     warnings.warn(msg)
-        # If no category is given, load every category in the given directory.
-        # Ignore synset folders not included in the official mapping.
+
         else:
             synset_set = {
                 synset
@@ -466,8 +360,6 @@ class ShapeNetCore(ShapeNetBase):
                 and synset in self.synset_dict
             }
 
-        # Check if there are any categories in the official mapping that are not loaded.
-        # Update self.synset_inv so that it only includes the loaded categories.
         synset_not_present = set(
             self.synset_dict.keys()).difference(synset_set)
         [self.synset_inv.pop(self.synset_dict[synset])
@@ -481,9 +373,6 @@ class ShapeNetCore(ShapeNetBase):
             ) % (version, data_dir, ", ".join(synset_not_present))
             warnings.warn(msg)
 
-        # Extract model_id of each object from directory names.
-        # Each grandchildren directory of data_dir contains an object, and the name
-        # of the directory is the object's model_id.
         for synset in synset_set:
             self.synset_start_idxs[synset] = len(self.synset_ids)
             for model in os.listdir(path.join(data_dir, synset)):
@@ -492,18 +381,18 @@ class ShapeNetCore(ShapeNetBase):
                         "Object file not found in the model directory %s "
                         "under synset directory %s."
                     ) % (model, synset)
-                    # warnings.warn(msg)
+
                     continue
                 self.synset_ids.append(synset)
                 self.model_ids.append(model)
             model_count = len(self.synset_ids) - self.synset_start_idxs[synset]
             self.synset_num_models[synset] = model_count
-        self.model_ids, self.synset_ids = sort_jointly([self.model_ids, self.synset_ids], dim=0)
+        self.model_ids, self.synset_ids = sort_jointly(
+            [self.model_ids, self.synset_ids], dim=0)
         self.classes = sorted(list(self.synset_inv.keys()))
         self.label_by_number = {k: v for v, k in enumerate(self.classes)}
 
-        # adding train/val/test splits of the data 
-        split_model_ids,split_synset_ids = [] , [] 
+        split_model_ids, split_synset_ids = [], []
         for ii, model in enumerate(self.model_ids):
             found = splits[splits.modelId.isin([model])]["split"]
             if len(found) > 0:
@@ -512,10 +401,6 @@ class ShapeNetCore(ShapeNetBase):
                     split_synset_ids.append(self.synset_ids[ii])
         self.model_ids = split_model_ids
         self.synset_ids = split_synset_ids
-        # self.model_ids = list(splits[splits.modelId.isin(self.model_ids)][splits.split.isin([self.split])]["modelId"])
-        # self.synset_ids = list(splits[splits.modelId.isin(self.model_ids)][splits.split.isin([self.split])]["synsetId"])
-
-
 
     def __getitem__(self, idx: int) -> Dict:
         """
@@ -536,24 +421,22 @@ class ShapeNetCore(ShapeNetBase):
         )
         verts, faces, textures = self._load_mesh(model_path)
         label_str = self.synset_dict[model["synset_id"]]
-        # model["verts"] = verts
-        # model["faces"] = faces
-        # model["textures"] = textures
-        # model["label"] = self.synset_dict[model["synset_id"]]
-        verts = torch_center_and_normalize(verts.to(torch.float), p=self.dset_norm)
 
-        verts_rgb = torch.ones_like(verts)[None]  # (1, V, 3)
+        verts = torch_center_and_normalize(
+            verts.to(torch.float), p=self.dset_norm)
+
+        verts_rgb = torch.ones_like(verts)[None]
         textures = Textures(verts_rgb=verts_rgb)
         mesh = Meshes(
             verts=[verts],
             faces=[faces],
             textures=textures
         )
-        points = trimesh.Trimesh(vertices=verts.numpy(), faces=faces.numpy()).sample(self.nb_points, False)
+        points = trimesh.Trimesh(vertices=verts.numpy(
+        ), faces=faces.numpy()).sample(self.nb_points, False)
         points = torch.from_numpy(points).to(torch.float)
         points = torch_center_and_normalize(points, p=self.dset_norm)
         return self.label_by_number[label_str], mesh, points, 1.0
-        # return model
 
 
 class ScanObjectNN(torch.utils.data.Dataset):
@@ -615,10 +498,10 @@ class ScanObjectNN(torch.utils.data.Dataset):
             for ii in range(len(pcdataset)):
                 if pcdataset["split"][ii] != "t":
                     self.labels_dict["train"][pcdataset["obj_id"]
-                                            [ii]] = pcdataset["label"][ii]
+                                              [ii]] = pcdataset["label"][ii]
                 else:
                     self.labels_dict["test"][pcdataset["obj_id"]
-                                            [ii]] = pcdataset["label"][ii]
+                                             [ii]] = pcdataset["label"][ii]
 
             all_obj_ids = glob.glob(os.path.join(self.data_dir, "*/*.bin"))
             filtered_ids = list(filter(lambda x: "part" not in os.path.split(
@@ -629,13 +512,11 @@ class ScanObjectNN(torch.utils.data.Dataset):
             self.objects_paths["test"] = sorted(
                 [x for x in filtered_ids if os.path.split(x)[-1] in self.labels_dict["test"].keys()])
         else:
-            filename = os.path.join(data_dir, "{}_objectdataset_augmentedrot_scale75.h5".format(self.split))
+            filename = os.path.join(
+                data_dir, "{}_objectdataset_augmentedrot_scale75.h5".format(self.split))
             with h5py.File(filename, "r") as f:
                 self.labels_dict[self.split] = np.array(f["label"])
                 self.objects_paths[self.split] = np.array(f["data"])
-            #     print("1############", len(self.labels_dict[self.split]))
-            # print("2############", len(self.labels_dict[self.split]))
-
 
     def __getitem__(self, idx: int) -> Dict:
         """
@@ -644,11 +525,12 @@ class ScanObjectNN(torch.utils.data.Dataset):
         """
         if self.variant != "hardest":
             obj_path = self.objects_paths[self.split][idx]
-            # obj_path,label
+
             points = self.load_pc_file(obj_path)
-            # sample the required number of points randomly
-            points = points[np.random.randint(points.shape[0], size=self.nb_points),:]
-            # print(pc.min(),classes[label],obj_path)
+
+            points = points[np.random.randint(
+                points.shape[0], size=self.nb_points), :]
+
             label = self.labels_dict[self.split][os.path.split(obj_path)[-1]]
         else:
 
@@ -662,29 +544,25 @@ class ScanObjectNN(torch.utils.data.Dataset):
     def __len__(self):
         return len(self.objects_paths[self.split])
 
-    def load_pc_file(self,filename):
-        #load bin file
-        # pc=np.fromfile(filename, dtype=np.float32)
+    def load_pc_file(self, filename):
+
         pc = np.fromfile(filename, dtype=np.float32)
 
-        #first entry is the number of points
-        #then x, y, z, nx, ny, nz, r, g, b, label, nyu_label
         if(self.suncg):
             pc = pc[1:].reshape((-1, 3))
         else:
             pc = pc[1:].reshape((-1, 11))
 
-        #only use x, y, z for now
         if self.variant == "with_bg":
             pc = np.array(pc[:, 0:3])
             return pc
 
         else:
-            ##To remove backgorund points
-            ##filter unwanted class
+
             filtered_idx = np.intersect1d(np.intersect1d(np.where(
                 pc[:, -1] != 0)[0], np.where(pc[:, -1] != 1)[0]), np.where(pc[:, -1] != 2)[0])
-            (values, counts) = np.unique(pc[filtered_idx, -1], return_counts=True)
+            (values, counts) = np.unique(
+                pc[filtered_idx, -1], return_counts=True)
             max_ind = np.argmax(counts)
             idx = np.where(pc[:, -1] == values[max_ind])[0]
             pc = np.array(pc[idx, 0:3])
@@ -716,7 +594,6 @@ class PartNormalDataset(torch.utils.data.Dataset):
 
         if not class_choice is None:
             self.cat = {k: v for k, v in self.cat.items() if k in class_choice}
-        # print(self.cat)
 
         self.meta = {}
         with open(os.path.join(self.root, 'train_test_split', 'shuffled_train_file_list.json'), 'r') as f:
@@ -726,11 +603,11 @@ class PartNormalDataset(torch.utils.data.Dataset):
         with open(os.path.join(self.root, 'train_test_split', 'shuffled_test_file_list.json'), 'r') as f:
             test_ids = set([str(d.split('/')[2]) for d in json.load(f)])
         for item in self.cat:
-            # print('category', item)
+
             self.meta[item] = []
             dir_point = os.path.join(self.root, self.cat[item])
             fns = sorted(os.listdir(dir_point))
-            # print(fns[0][0:-4])
+
             if split == 'trainval':
                 fns = [fn for fn in fns if (
                     (fn[0:-4] in train_ids) or (fn[0:-4] in val_ids))]
@@ -744,7 +621,6 @@ class PartNormalDataset(torch.utils.data.Dataset):
                 print('Unknown split: %s. Exiting..' % (split))
                 exit(-1)
 
-            # print(os.path.basename(fns))
             for fn in fns:
                 token = (os.path.splitext(os.path.basename(fn))[0])
                 self.meta[item].append(os.path.join(dir_point, token + '.txt'))
@@ -758,22 +634,23 @@ class PartNormalDataset(torch.utils.data.Dataset):
         for i in self.cat.keys():
             self.classes[i] = self.classes_original[i]
 
-        # Mapping from category ('Chair') to a list of int [10,11,12,13] as segmentation labels
         self.seg_classes = {'Earphone': [16, 17, 18], 'Motorbike': [30, 31, 32, 33, 34, 35], 'Rocket': [41, 42, 43],
                             'Car': [8, 9, 10, 11], 'Laptop': [28, 29], 'Cap': [6, 7], 'Skateboard': [44, 45, 46],
                             'Mug': [36, 37], 'Guitar': [19, 20, 21], 'Bag': [4, 5], 'Lamp': [24, 25, 26, 27],
                             'Table': [47, 48, 49], 'Airplane': [0, 1, 2, 3], 'Pistol': [38, 39, 40],
                             'Chair': [12, 13, 14, 15], 'Knife': [22, 23]}
-        self.clsnb_to_label = {ii: k for ii,k in enumerate(sorted(list(self.seg_classes.keys())))}
-        self.cls_to_parts = {ii: self.seg_classes[self.clsnb_to_label[ii]] for ii in range(len(self.seg_classes))}
+        self.clsnb_to_label = {ii: k for ii, k in enumerate(
+            sorted(list(self.seg_classes.keys())))}
+        self.cls_to_parts = {
+            ii: self.seg_classes[self.clsnb_to_label[ii]] for ii in range(len(self.seg_classes))}
 
         self.part_classes = []
         for k, v in self.classes.items():
             self.part_classes.extend(self.seg_classes[k])
-        self.part_classes = sorted(self.part_classes)       
+        self.part_classes = sorted(self.part_classes)
         skeys = sorted(list(self.seg_classes.keys()))
         self.parts_per_class = [len(self.seg_classes[x]) for x in skeys]
-        self.cache = {}  # from index to (point_set, cls, seg) tuple
+        self.cache = {}
         self.cache_size = 20000
 
     def __getitem__(self, index):
@@ -793,20 +670,17 @@ class PartNormalDataset(torch.utils.data.Dataset):
             if len(self.cache) < self.cache_size:
                 self.cache[index] = (point_set, cls, seg)
         point_set[:, 0:3] = pc_normalize(point_set[:, 0:3])
-        
-        
+
         true_nb_points = point_set.shape[0]
-        # resample
-        # choice = np.random.choice(len(seg), self.npoints, replace=True)
+
         if true_nb_points >= self.npoints:
             choice = np.arange(self.npoints)
             real_points_mask = np.ones(self.npoints, dtype=np.int)
-        else :
-            choice = np.ones(self.npoints,dtype=np.int) * (true_nb_points-1)
+        else:
+            choice = np.ones(self.npoints, dtype=np.int) * (true_nb_points-1)
             choice[:true_nb_points] = np.arange(true_nb_points)
             real_points_mask = np.zeros(self.npoints, dtype=np.int)
             real_points_mask[:true_nb_points] = 1
-
 
         point_set = point_set[choice, :]
         seg = seg[choice]

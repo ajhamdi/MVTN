@@ -1,5 +1,4 @@
 import matplotlib.pyplot as plt
-from ptflops import get_model_complexity_info
 import mpl_toolkits
 import torch
 import math
@@ -1032,16 +1031,3 @@ def up_sample_ptc_batch(points_batch, target):
         up_sampled_batch.append(up_sample_ptc(points_batch[ii, ...], target))
     return np.array(up_sampled_batch)
 
-
-def fully_profile_network(model, input_size=(3, 224, 224), MAX_ITER=10000, verbose=False):
-    """
-    fully characterize a Pytorch model in terms of speed (ms), number of parameters (M), and, number of operations (GFLOPS)
-    """
-    macs, params = get_model_complexity_info(
-        model, input_size, as_strings=False, print_per_layer_stat=False, verbose=verbose)
-    inp = torch.rand((1, *input_size)).cuda()
-    avg_time = profile_op(MAX_ITER, model.cuda(), inp)
-    if verbose:
-        print(model, "\n\n\n" "\t", macs, "\t",
-              params, "\t", "{}".format(avg_time*1e3))
-    return 2 * macs * 1e-9, params*1e-6, avg_time*1e3
