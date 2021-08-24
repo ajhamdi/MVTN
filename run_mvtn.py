@@ -59,8 +59,6 @@ parser.add_argument('--dset_variant', '-dsetp', help='The variant used of the `S
                     default="obj_only", choices=["obj_only", "with_bg", "hardest"])
 parser.add_argument('--pc_rendering', dest='pc_rendering',
                     action='store_true', help='use point cloud renderer instead of mesh renderer  ')
-parser.add_argument('--light_direction', '-ldrct',  default="random", choices=["fixed", "random", "relative"],
-                    help=' if rendering a mesh, apply random light direction on the rendered images during training , or relative to the camera or otherwise default (0, 1.0, 0)')
 parser.add_argument('--object_color', '-clr',  default="white", choices=["white", "random", "black", "red", "green", "blue", "custom"],
                     help='the selection type of views ')
 parser.add_argument('--epochs', default=100, type=int,
