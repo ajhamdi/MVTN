@@ -7,12 +7,13 @@ import numpy as np
 import glob
 import h5py
 import pandas as pd
+import collections
 from torch.utils.data.dataset import Dataset
 import os
 import torch
 from PIL import Image
 from util import torch_center_and_normalize, sort_jointly, load_obj, load_text
-from torch._six import container_abcs, string_classes, int_classes
+# from torch._six import container_abcs, string_classes, int_classes
 
 import trimesh
 import math
@@ -168,15 +169,15 @@ def collate_fn(batch):
             return torch.as_tensor(batch)
     elif isinstance(elem, float):
         return torch.tensor(batch, dtype=torch.float64)
-    elif isinstance(elem, int_classes):
+    elif isinstance(elem, (int)):
         return torch.tensor(batch)
-    elif isinstance(elem, string_classes):
+    elif isinstance(elem, (str, bytes)):
         return batch
-    elif isinstance(elem, container_abcs.Mapping):
+    elif isinstance(elem, collections.abc.Mapping):
         return {key: collate_fn([d[key] for d in batch]) for key in elem}
     elif isinstance(elem, tuple) and hasattr(elem, '_fields'):
         return elem_type(*(collate_fn(samples) for samples in zip(*batch)))
-    elif isinstance(elem, container_abcs.Sequence):
+    elif isinstance(elem, collections.abc.Sequence):
 
         it = iter(batch)
         elem_size = len(next(it))

@@ -8,7 +8,6 @@ import os
 import pickle
 import copy
 import pandas as pd
-import pptk
 import imageio
 import trimesh
 from torch import nn
@@ -465,8 +464,7 @@ def torch_augment_pointcloud(pointcloud):
     scale =torch.FloatTensor(3).uniform_(2.0/3, 3.0/2)
 
 
-    ## TASK 1.1.2 generate a shift variable of size [3] from a uniform distruction between [-0.2, 0.2] of size [3]. shift will be added to the point cloud
-    # shift = torch.random.uniform(-0.2, 0.2, 3)
+
     shift = torch.FloatTensor(3).uniform_(-0.2, 0.2)
 
 
@@ -488,11 +486,6 @@ def logEpoch(logger, model, epoch, loss, accuracy):
         logger.histo_summary(tag, value.data.cpu().numpy(), epoch)
         logger.histo_summary(tag + '/grad', value.grad.data.cpu().numpy(), epoch)
 
-    # 3. Log training images (image summary)
-    #info = {'images': images.view(-1, 28, 28)[:10].cpu().numpy()}
-
-    #for tag, images in info.items():
-        #logger.image_summary(tag, images, epoch)
 
 
 def rotation_matrix(axis, theta, in_degrees=True):
@@ -540,12 +533,6 @@ def unbatch_tensor(tensor, batch_size, dim=1, unsqueeze=False):
     else:
         return torch.cat(torch.chunk(tensor, nb_chunks, dim=0), dim=dim).contiguous()
 
-# batch_size = 3
-# a = torch.rand(batch_size,4,5)
-# b= batch_tensor(a , dim=1,squeeze=True)
-# c = unbatch_tensor(b ,batch_size, dim=1,unsqueeze=True)
-# print(b.shape,c.shape)
-# a,b,c
 
 
 def image_grid(
@@ -703,30 +690,6 @@ def devide_points_by_labels(points, labels):
     return [points[labels == lbl] for lbl in np.unique(labels)]
 
 
-def view_ptc_list(points_list, color_list, size, save_name=None, show_floor=False):
-    ptc_nb_list = [pnt.shape[0] for pnt in points_list]
-    color_list = color_list[:len(ptc_nb_list)]
-    points = np.concatenate(points_list, axis=0)
-    viewer = pptk.viewer(points)
-    colors = np.concatenate([np.repeat(np.array([[color[0], color[1], color[2]]]), ptc_nb, axis=0)
-                             for color, ptc_nb in zip(color_list, ptc_nb_list)], axis=0)  # RED = ADv  ...... BLUE = ORIGINAL
-    viewer.attributes(colors)
-    viewer.set(point_size=size, bg_color=(1, 1, 1, 1), floor_color=(0, 0, 0, 1), show_info=False,
-               show_axis=False, show_grid=show_floor, r=5, phi=-np.radians(60), theta=np.radians(20))
-    if save_name:
-        viewer.capture(save_name)
-    return viewer
-
-
-def view_ptc_labels(points, labels, color_list, size, save_name=None, show_floor=False):
-    """ show 3D ppoint cloud and save the image   """
-
-    points_list = devide_points_by_labels(points, labels)
-    viewer = view_ptc_list(points_list, color_list, size,
-                           save_name=save_name, show_floor=show_floor)
-    return viewer
-
-
 def rotation_matrix(axis, theta, in_degrees=True):
     """
     Return the rotation matrix associated with counterclockwise rotation about
@@ -804,32 +767,6 @@ def check_folder(data_dir):
         os.mkdir(data_dir)
 
 
-def view_ptc(points, color, size, save_name=None, show_floor=False):
-    ptc_nb = points.shape[0]
-    viewer = pptk.viewer(points)
-    # RED = ADv  ...... BLUE = ORIGINAL
-    colors = np.repeat(
-        np.array([[color[0], color[1], color[2]]]), ptc_nb, axis=0)
-    viewer.attributes(colors)
-    viewer.set(point_size=size, bg_color=(1, 1, 1, 1), floor_color=(0, 0, 0, 1), show_info=False,
-               show_axis=False, show_grid=show_floor, r=5, phi=-np.radians(60), theta=np.radians(20))
-    if save_name:
-        viewer.capture(save_name)
-    return viewer
-
-
-def play_ptc(viewer, save_dir=None, duration=0.001):
-    """
-    play animation around the pptk.viewer object that is passed to it as viewer 
-    if you want to save the vidoe : put your directory in "save_dir"
-    duration determines how fast is teh resulting animation.gif 
-    """
-    viewer.play([(0, 0, 0, x, x/10.0, x) for x in range(1, 9)], repeat=True)
-    if save_dir:
-        viewer.record(save_dir, [(0, 0, 0, x, x/10.0, x) for x in range(1, 9)])
-        viewer.close()
-        viewer.close()
-        gif_folder(save_dir, extension="png", duration=0.001)
 
 
 def random_id(digits_nb=4, include_letters=True, only_capital=True, unique_digits=False):
