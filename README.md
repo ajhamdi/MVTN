@@ -25,14 +25,20 @@ If you find our work useful in your research, please consider citing:
 This code is tested with Python 3.7 and Pytorch >= 1.4
 
 - install Pytorch3d from [here](https://github.com/facebookresearch/pytorch3d/blob/master/INSTALL.md)
-
+```bash
+conda create -y -n MVTN python=3.7
+conda activate MVTN
+conda install -c pytorch pytorch=1.7.1 torchvision cudatoolkit=10.2
+conda install -c fvcore -c iopath -c conda-forge fvcore iopath
+conda install -c bottler nvidiacub
+conda install pytorch3d -c pytorch3d
+``` 
 - install other helper libraries 
 
 ```bash
 conda install pandas
-pip install imageio
 conda install -c conda-forge trimesh
-pip install einops
+pip install einops imageio scipy matplotlib tensorboard h5py
 ``` 
 
 ## Usage: 3D Classification & Retrieval
