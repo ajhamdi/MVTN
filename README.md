@@ -1,6 +1,6 @@
 # MVTN: Multi-View Transformation Network for 3D Shape Recognition (ICCV 2021)
 By [Abdullah Hamdi](https://abdullahamdi.com/), [Silvio Giancola](https://www.silviogiancola.com/), [Bernard Ghanem](http://www.bernardghanem.com/)
-### [paper](https://arxiv.org/pdf/2011.13244.pdf) | [Video]() | [Tutorial]() . <br>
+### [paper](https://arxiv.org/pdf/2011.13244.pdf) | Video | Tutorial . <br>
 
 <br>
 
@@ -48,23 +48,21 @@ First download the datasets and unzip inside the `data/` directories as follows:
 - ScanObjectNN [this link](https://drive.google.com/file/d/15xhYA8SC5EdLKZA_xV0FXyRy8f-qGMs5/view?usp=sharing) (ScanObjectNN with its three main variants [`obj_only` ,`with_bg` , `hardest`] controlled by the `--dset_variant` option  ). 
 
 Then you can run MVTN with 
+```bash
+python run_mvtn.py --data_dir data/ModelNet40/ --run_mode train --mvnetwork mvcnn --nb_views 8 --views_config learned_spherical  
 ```
-python run_mvtn.py --data_dir data/ModelNet40/ --run_mode train --nb_views 8 --views_config circular 
-```
-- `--run_mode` is the run mode. choices: "train"(train pipeline), "test_cls"(test classification after training), "test_retr"(test retrieval after training), "test_rot"(test rotation robustness after training), "test_occ"(test occlusion robustness after training)
-- `--views_config` is one of six view selections :  choices=("circular", "random", "spherical" "learned_circular" , "learned_spherical" , "learned_direct")
+- `--data_dir` the data directory. The dataloader is picked adaptively from `custom_dataset.py` based on the choice between "ModelNet40", "ShapeNetCore.v2", or the "ScanObjectNN" choice.
+- `--run_mode` is the run mode. choices: "train"(train for classification), "test_cls"(test classification after training), "test_retr"(test retrieval after training), "test_rot"(test rotation robustness after training), "test_occ"(test occlusion robustness after training)
+- `--mvnetwork` is the multi-view network used in the pipeline. Choices: "[mvcnn](https://github.com/RBirkeland/MVCNN-PyTorch)" , "[rotnet](https://github.com/kanezaki/pytorch-rotationnet)", "[viewgcn](https://github.com/weixmath/view-GCN)"
+- `--views_config` is one of six view selection methods that are either learned or heuristics :  choices: "circular", "random", "spherical" "learned_circular" , "learned_spherical" , "learned_direct". Only the ones that are learned are MVTN variants.
 - `--resume` continue training from last checkpoint.
-- `--pretrained` use ImageNet pretrained networks in the CNN
-- `--image_data` the folder for prerendered images ( not needed really ).
-- `--mesh_data` : the folder that has the meshes ( ModelNEt40 ) 
-- `--simplified_mesh` : a Flag if you want to use the simplified meshes not the full meshes. This should be used as default to fit the GPUS.
-- `--pc_rendering` : a Flag if you want to use point clouds instead of mesh data and point cloud rendering instead of mesh rendering. This is the default when only point cloud data is available ( like in ScanObjectNN dataset)
-Other parameters can be founded in the script, or run `python mvt_cls.py -h`. The default parameters are the ones used in the paper.
+- `--pc_rendering` : a Flag if you want to use point clouds instead of mesh data and point cloud rendering instead of mesh rendering. This should be default when only point cloud data is available ( like in ScanObjectNN dataset)
+- `--object_color`: is the uniform color of the mesh or object rendered. default="white", choices=["white", "random", "black", "red", "green", "blue", "custom"]
+Other parameters can be founded in `config.yaml` configuration file or run `python run_mvtn.py -h`. The default parameters are the ones used in the paper.
 
-The results will be saved in `results/00/0001/` folder that canotina the camera view points and the renderings of some example as well the checkpoints and the logs.
+The results will be saved in `results/00/0001/` folder that contaions the camera view points and the renderings of some example as well the checkpoints and the logs.
 <br>
 
-The `ViewSelector` object in `ops.py` is the main class in this work .. it has options "random" , "circular" and "learned" ... 
 
 ## Other files
 - `models/renderer.py` contains the main Pytorch3D  differentiable renderer class that can render multi-view images for point clouds and meshes adaptively.
