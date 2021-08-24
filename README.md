@@ -35,7 +35,7 @@ conda install -c conda-forge trimesh
 pip install einops
 ``` 
 
-## Usage
+## Usage: 3D Classification & Retrieval
 
 The main Python script in the root directorty `run_mvtn.py`. 
 
