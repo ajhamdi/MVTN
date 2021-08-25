@@ -22,7 +22,7 @@ If you find our work useful in your research, please consider citing:
 
 
 ## Requirement
-This code is tested with Python 3.7 and Pytorch >= 1.4
+This code is tested with Python 3.7 and Pytorch >= 1.5
 
 - install [Pytorch3d](https://github.com/facebookresearch/pytorch3d/blob/master/INSTALL.md) as follows
 ```bash
