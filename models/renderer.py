@@ -11,7 +11,6 @@ import numpy as np
 
 from torch import nn
 from torch._six import inf
-from ptflops import get_model_complexity_info
 from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
 
