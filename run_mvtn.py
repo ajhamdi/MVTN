@@ -83,12 +83,6 @@ else:
 
 print('Loading data')
 
-transform = transforms.Compose([
-    transforms.CenterCrop(500),
-    transforms.Resize(224),
-    transforms.ToTensor(),
-])
-
 
 torch.cuda.set_device(int(setup["gpu"]))
 if "modelnet" in setup["data_dir"].lower():

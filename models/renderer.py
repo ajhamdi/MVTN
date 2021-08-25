@@ -10,7 +10,6 @@ import numpy as np
 # to import files from parent dir
 
 from torch import nn
-from torch._six import inf
 from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
 
