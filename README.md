@@ -1,12 +1,12 @@
 # MVTN: Multi-View Transformation Network for 3D Shape Recognition (ICCV 2021)
 By [Abdullah Hamdi](https://abdullahamdi.com/), [Silvio Giancola](https://www.silviogiancola.com/), [Bernard Ghanem](http://www.bernardghanem.com/)
-### [paper](https://arxiv.org/pdf/2011.13244.pdf) | Video | Tutorial . <br>
+### [Paper](https://arxiv.org/pdf/2011.13244.pdf) | Video | Tutorial . <br>
 
 <br>
 
 <img src="https://github.com/ajhamdi/MVTN/blob/master/doc/pipeline.png" width="80%" alt="MVTN pipeline" align=center>
 
-The official Pytroch code of ICCV 2021 paper [MVTN: Multi-View Transformation Network for 3D Shape Recognition](https://arxiv.org/abs/2011.13244) . MVTN learns to transform the rendering parameters of a 3D object to improve the perspectives for better recognition by multi-view netowkrs. Without extra supervision or add loss, MVTN improve the performance in 3D classification and shape retrieval. MVTN achieves state-of-the-art performance on ModelNet40, ShapeNet Core55, and the most recent and realistic ScanObjectNN dataset (up to 6% improvement).  
+The official Pytroch code of ICCV 2021 paper [MVTN: Multi-View Transformation Network for 3D Shape Recognition](https://arxiv.org/abs/2011.13244). MVTN learns to transform the rendering parameters of a 3D object to improve the perspectives for better recognition by multi-view netowkrs. Without extra supervision or add loss, MVTN improve the performance in 3D classification and shape retrieval. MVTN achieves state-of-the-art performance on ModelNet40, ShapeNet Core55, and the most recent and realistic ScanObjectNN dataset (up to 6% improvement).  
 
 ## Citation
 If you find our work useful in your research, please consider citing:
