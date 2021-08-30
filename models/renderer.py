@@ -1,21 +1,4 @@
-import sys
-import os
-
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from util import *
-from ops import check_and_correct_rotation_matrix
-import torch
-from torch.autograd import Variable
-import numpy as np
-# to import files from parent dir
-
-from torch import nn
-from einops import rearrange, repeat
-from einops.layers.torch import Rearrange
-
-
-from pytorch3d.structures import Meshes, Pointclouds
-from pytorch3d.renderer.mesh import Textures
+from pytorch3d.renderer.cameras import camera_position_from_spherical_angles
 from pytorch3d.renderer import (
     OpenGLPerspectiveCameras, look_at_view_transform, look_at_rotation,
     RasterizationSettings, MeshRenderer, MeshRasterizer, BlendParams,
@@ -27,11 +10,24 @@ from pytorch3d.renderer import (
     PointsRasterizer,
     AlphaCompositor,
     NormWeightedCompositor, DirectionalLights)
-from pytorch3d.renderer.cameras import camera_position_from_spherical_angles
+from pytorch3d.renderer.mesh import Textures
+from pytorch3d.structures import Meshes, Pointclouds
+from einops.layers.torch import Rearrange
+from einops import rearrange, repeat
+from torch import nn
+import numpy as np
+from torch.autograd import Variable
+import torch
+from ops import check_and_correct_rotation_matrix
+from util import *
+import sys
+import os
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 
 ORTHOGONAL_THRESHOLD = 1e-6
 EXAHSTION_LIMIT = 20
-
 
 
 class MVRenderer(nn.Module):
@@ -66,24 +62,20 @@ class MVRenderer(nn.Module):
         self.light_direction_type = light_direction
         self.cull_backfaces = cull_backfaces
 
-        
-        # self.EPSILON = 0.00001 # color normalization epsilon 
-
-    def render_meshes(self,meshes, color, azim, elev, dist, lights, background_color=(1.0, 1.0, 1.0), ):
+    def render_meshes(self, meshes, color, azim, elev, dist, lights, background_color=(1.0, 1.0, 1.0), ):
         c_batch_size = len(meshes)
         verts = [msh.verts_list()[0].cuda() for msh in meshes]
         faces = [msh.faces_list()[0].cuda() for msh in meshes]
-        # faces = [torch.cat((fs, torch.flip(fs, dims=[1])),dim=0) for fs in faces]
+
         new_meshes = Meshes(
             verts=verts,
             faces=faces,
             textures=None)
         max_vert = new_meshes.verts_padded().shape[1]
 
-        # print(len(new_meshes.faces_list()[0]))
         new_meshes.textures = Textures(
             verts_rgb=color.cuda()*torch.ones((c_batch_size, max_vert, 3)).cuda())
-        # Create a Meshes object for the teapot. Here we have only one mesh in the batch.
+
         R, T = look_at_view_transform(dist=batch_tensor(dist.T, dim=1, squeeze=True), elev=batch_tensor(
             elev.T, dim=1, squeeze=True), azim=batch_tensor(azim.T, dim=1, squeeze=True))
         R, T = check_and_correct_rotation_matrix(
@@ -92,18 +84,16 @@ class MVRenderer(nn.Module):
         cameras = OpenGLPerspectiveCameras(
             device="cuda:{}".format(torch.cuda.current_device()), R=R, T=T)
         camera = OpenGLPerspectiveCameras(device="cuda:{}".format(torch.cuda.current_device()), R=R[None, 0, ...],
-                                        T=T[None, 0, ...])
+                                          T=T[None, 0, ...])
 
-        # camera2 = OpenGLPerspectiveCameras(device=device, R=R[None, 2, ...],T=T[None, 2, ...])
-        # print(camera2.get_camera_center())
         raster_settings = RasterizationSettings(
             image_size=self.image_size,
             blur_radius=0.0,
             faces_per_pixel=self.faces_per_pixel,
-            # bin_size=None, #int
-            # max_faces_per_bin=None,  # int
-            # perspective_correct=False,
-            # clip_barycentric_coords=None, #bool
+
+
+
+
             cull_backfaces=self.cull_backfaces,
         )
         renderer = MeshRenderer(
@@ -114,26 +104,21 @@ class MVRenderer(nn.Module):
         )
         new_meshes = new_meshes.extend(self.nb_views)
 
-        # compute output
-        # print("after rendering .. ", rendered_images.shape)
-
         rendered_images = renderer(new_meshes, cameras=cameras, lights=lights)
 
         rendered_images = unbatch_tensor(
             rendered_images, batch_size=self.nb_views, dim=1, unsqueeze=True).transpose(0, 1)
-        # print(rendered_images[:, 100, 100, 0])
 
-        rendered_images = rendered_images[..., 0:3].transpose(2, 4).transpose(3, 4)
+        rendered_images = rendered_images[...,
+                                          0:3].transpose(2, 4).transpose(3, 4)
         return rendered_images, cameras
 
     def render_points(self, points, color, azim, elev, dist, background_color=(0.0, 0.0, 0.0), ):
         c_batch_size = azim.shape[0]
 
         point_cloud = Pointclouds(points=points.to(torch.float), features=color *
-                                torch.ones_like(points, dtype=torch.float)).cuda()
+                                  torch.ones_like(points, dtype=torch.float)).cuda()
 
-        # print(len(new_meshes.faces_list()[0]))
-        # Create a Meshes object for the teapot. Here we have only one mesh in the batch.
         R, T = look_at_view_transform(dist=batch_tensor(dist.T, dim=1, squeeze=True), elev=batch_tensor(
             elev.T, dim=1, squeeze=True), azim=batch_tensor(azim.T, dim=1, squeeze=True))
         R, T = check_and_correct_rotation_matrix(
@@ -150,7 +135,8 @@ class MVRenderer(nn.Module):
         renderer = PointsRenderer(
             rasterizer=PointsRasterizer(
                 cameras=cameras, raster_settings=raster_settings),
-            compositor=NormWeightedCompositor(background_color=background_color)
+            compositor=NormWeightedCompositor(
+                background_color=background_color)
         )
         point_cloud = point_cloud.extend(self.nb_views)
         point_cloud.scale_(batch_tensor(1.0/dist.T, dim=1,
@@ -160,16 +146,17 @@ class MVRenderer(nn.Module):
         rendered_images = unbatch_tensor(
             rendered_images, batch_size=self.nb_views, dim=1, unsqueeze=True).transpose(0, 1)
 
-        rendered_images = rendered_images[..., 0:3].transpose(2, 4).transpose(3, 4)
+        rendered_images = rendered_images[...,
+                                          0:3].transpose(2, 4).transpose(3, 4)
         return rendered_images, cameras
 
     def rendering_color(self, custom_color=(1.0, 0, 0)):
         if self.object_color == "custom":
-            color =  custom_color
+            color = custom_color
         elif self.object_color == "random" and not self.training:
             color = torch_color("white")
         else:
-            color = torch_color(self.object_color,max_lightness=True,)
+            color = torch_color(self.object_color, max_lightness=True,)
         return color
 
     def light_direction(self, azim, elev, dist):
@@ -177,10 +164,10 @@ class MVRenderer(nn.Module):
             return ((0, 1.0, 0),)
         elif self.light_direction_type == "random" and self.training:
             return (tuple(1.0 - 2 * np.random.rand(3)),)
-        else:  
-         relative_view = Variable(camera_position_from_spherical_angles(distance=batch_tensor(dist.T, dim=1, squeeze=True), elevation=batch_tensor(
-             elev.T, dim=1, squeeze=True), azimuth=batch_tensor(azim.T, dim=1, squeeze=True))).to(torch.float)
-        #  return correction_factor.repeat_interleave((self.nb_views))[..., None].repeat(1, 3).to(torch.float) * relative_view
+        else:
+            relative_view = Variable(camera_position_from_spherical_angles(distance=batch_tensor(dist.T, dim=1, squeeze=True), elevation=batch_tensor(
+                elev.T, dim=1, squeeze=True), azimuth=batch_tensor(azim.T, dim=1, squeeze=True))).to(torch.float)
+
         return relative_view
 
     def forward(self, meshes, points, azim, elev, dist, color=None):
@@ -195,7 +182,8 @@ class MVRenderer(nn.Module):
             `color`: B * N * 3 tensor, The RGB colors of batch of point clouds/meshes with N is the number of points/vertices  and B batch size. Only if `self.object_color` == `custom`, otherwise this option not used
 
         """
-        background_color = torch_color(self.background_color, max_lightness=True,).cuda()
+        background_color = torch_color(
+            self.background_color, max_lightness=True,).cuda()
         color = self.rendering_color(color)
 
         if not self.pc_rendering:
@@ -211,8 +199,9 @@ class MVRenderer(nn.Module):
 
     def render_and_save(self, meshes, points, azim, elev, dist, images_path, cameras_path, color=None):
         with torch.no_grad():
-            rendered_images, cameras = self.forward(meshes, points, azim, elev, dist, color)
-        # print("before saving .. ",rendered_images.shape)
+            rendered_images, cameras = self.forward(
+                meshes, points, azim, elev, dist, color)
+
         save_grid(image_batch=rendered_images[0, ...],
-                save_path=images_path, nrow=self.nb_views)
+                  save_path=images_path, nrow=self.nb_views)
         save_cameras(cameras, save_path=cameras_path, scale=0.22, dpi=200)
