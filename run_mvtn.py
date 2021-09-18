@@ -216,7 +216,7 @@ def train(data_loader, models_bag, setup):
             print("\tIter [%d/%d] Loss: %.4f" %
                   (i + 1, train_size, loss.item()))
         correct += (predicted.cpu() == targets.cpu()).sum()
-        total_loss += loss
+        total_loss += loss.item()
         n += 1
     avg_loss = total_loss / n
     avg_train_acc = 100 * correct / total
@@ -316,7 +316,7 @@ def train_rotationNet(data_loader, models_bag, setup):
             print("\tIter [%d/%d] Loss: %.4f" %
                   (i + 1, train_size, loss.item()))
 
-        total_loss += loss
+        total_loss += loss.item()
         n += 1
     avg_loss = total_loss / n
 
@@ -360,7 +360,7 @@ def evaluate_rotationNet(data_loader, models_bag, setup):
                                    setup["nb_views"], topk=(1, 5))
             top1.update(prec1.item(), c_batch_size)
 
-            total_loss += loss
+            total_loss += loss.item()
             n += 1
     avg_loss = total_loss / n
 
@@ -431,7 +431,7 @@ def evluate(data_loader, models_bag,  setup, is_test=False, retrieval=False):
                                 "view_nb": int(targets.cpu().numpy().shape[0]) * list(range(setup["nb_views"])),
                                 "exp_id": int(targets.cpu().numpy().shape[0]) * int(setup["nb_views"]) * [setup["exp_id"]]})
             views_record.extend(c_views)
-            total_loss += loss
+            total_loss += loss.item()
             n += 1
             _, predicted = torch.max(outputs.data, 1)
             total += targets.size(0)
@@ -484,7 +484,7 @@ def compute_features(data_loader, models_bag, setup):
                                 "view_nb": int(targets.cpu().numpy().shape[0]) * list(range(setup["nb_views"])),
                                 "exp_id": int(targets.cpu().numpy().shape[0]) * int(setup["nb_views"]) * [setup["exp_id"]]})
             views_record.extend(c_views)
-            total_loss += loss
+            total_loss += loss.item()
             n += 1
             _, predicted = torch.max(outputs.data, 1)
             total += targets.size(0)
@@ -536,7 +536,7 @@ def evluate_rotation_robustness(data_loader, models_bag,  setup, max_degs=180.0,
             outputs = models_bag["mvnetwork"](rendered_images)[0]
             loss = criterion(outputs, targets)
 
-            total_loss += loss
+            total_loss += loss.item()
             n += 1
             _, predicted = torch.max(outputs.data, 1)
             total += targets.size(0)
@@ -629,11 +629,11 @@ if setup["mvnetwork"] == "mvcnn":
             print('\ttrain acc: %.2f - train Loss: %.4f' %
                   (avg_train_acc.item(), avg_train_loss.item()))
             print('\tVal Acc: %.2f - val Loss: %.4f' %
-                  (avg_test_acc.item(), avg_loss.item()))
+                  (avg_test_acc.item(), avg_loss))
             print('\tCurrent best val acc: %.2f' % setup["best_acc"])
             if setup["log_metrics"]:
                 writer.add_scalar('Loss/train', avg_train_loss.item(), epoch)
-                writer.add_scalar('Loss/val', avg_loss.item(), epoch)
+                writer.add_scalar('Loss/val', avg_loss, epoch)
                 writer.add_scalar('Accuracy/train',
                                   avg_train_acc.item(), epoch)
                 writer.add_scalar('Accuracy/val', avg_test_acc.item(), epoch)
@@ -654,7 +654,7 @@ if setup["mvnetwork"] == "mvcnn":
             if avg_test_acc.item() >= setup["best_acc"]:
                 print('\tSaving checkpoint - Acc: %.2f' % avg_test_acc)
                 saveables["best_acc"] = avg_test_acc
-                setup["best_loss"] = avg_loss.item()
+                setup["best_loss"] = avg_loss
                 setup["best_acc"] = avg_test_acc.item()
                 save_checkpoint(saveables, setup, views_record,
                                 setup["weights_file"])
@@ -889,11 +889,11 @@ elif setup["mvnetwork"] == "rotnet":
         print('\nEvaluation:')
 
         print('\tVal Acc: %.2f - val Loss: %.4f' %
-              (avg_test_acc, avg_loss.item()))
+              (avg_test_acc, avg_loss))
         print('\tCurrent best val acc: %.2f' % setup["best_acc"])
         if setup["log_metrics"] and setup["run_mode"] == "train":
             writer.add_scalar('Loss/train', avg_train_loss.item(), epoch)
-            writer.add_scalar('Loss/val', avg_loss.item(), epoch)
+            writer.add_scalar('Loss/val', avg_loss, epoch)
             writer.add_scalar('Accuracy/train', avg_train_acc, epoch)
             writer.add_scalar('Accuracy/val', avg_test_acc, epoch)
 
@@ -911,7 +911,7 @@ elif setup["mvnetwork"] == "rotnet":
         if avg_test_acc >= setup["best_acc"]:
             print('\tSaving checkpoint - Acc: %.2f' % avg_test_acc)
             saveables["best_acc"] = avg_test_acc
-            setup["best_loss"] = avg_loss.item()
+            setup["best_loss"] = avg_loss
             setup["best_acc"] = avg_test_acc
             save_checkpoint(saveables, setup, None,
                             setup["weights_file"])

@@ -1,8 +1,8 @@
 # MVTN: Multi-View Transformation Network for 3D Shape Recognition (ICCV 2021)
 By [Abdullah Hamdi](https://abdullahamdi.com/), [Silvio Giancola](https://www.silviogiancola.com/), [Bernard Ghanem](http://www.bernardghanem.com/)
 ### [Paper](https://arxiv.org/pdf/2011.13244.pdf) | Video | Tutorial . <br>
-[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/mvtn-multi-view-transformation-network-for-3d/3d-object-retrieval-on-modelnet40)](https://paperswithcode.com/sota/3d-object-retrieval-on-modelnet40?p=mvtn-multi-view-transformation-network-for-3d)
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/mvtn-multi-view-transformation-network-for-3d/3d-point-cloud-classification-on-scanobjectnn)](https://paperswithcode.com/sota/3d-point-cloud-classification-on-scanobjectnn?p=mvtn-multi-view-transformation-network-for-3d)
+[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/mvtn-multi-view-transformation-network-for-3d/3d-object-retrieval-on-modelnet40)](https://paperswithcode.com/sota/3d-object-retrieval-on-modelnet40?p=mvtn-multi-view-transformation-network-for-3d)
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/mvtn-multi-view-transformation-network-for-3d/3d-object-retrieval-on-shapenetcore-55)](https://paperswithcode.com/sota/3d-object-retrieval-on-shapenetcore-55?p=mvtn-multi-view-transformation-network-for-3d)[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/mvtn-multi-view-transformation-network-for-3d/3d-point-cloud-classification-on-modelnet40)](https://paperswithcode.com/sota/3d-point-cloud-classification-on-modelnet40?p=mvtn-multi-view-transformation-network-for-3d)
 <br>
 
@@ -70,13 +70,15 @@ python run_mvtn.py --data_dir data/ModelNet40/ --run_mode train --mvnetwork mvcn
 Other parameters can be founded in `config.yaml` configuration file or run `python run_mvtn.py -h`. The default parameters are the ones used in the paper.
 
 The results will be saved in `results/00/0001/` folder that contaions the camera view points and the renderings of some example as well the checkpoints and the logs.
+
+**Note**: For best performance on point cloud tasks, please set `canonical_distance : 1.0` in the `config.yaml` file. For mesh tasks, keep as is. 
 <br>
 
 
 ## Other files
 - `models/renderer.py` contains the main Pytorch3D  differentiable renderer class that can render multi-view images for point clouds and meshes adaptively.
 - `models/mvtn.py` contains a standalone class for MVTN that can be used with any other pipeline.
-- `custom_dataset.py` includes all the pytorch dataloaders for 3D datasets: ModelNEt40, SahpeNet core55 ,ScanObjectNN, and ShapeNet Parts 
+- `custom_dataset.py` includes all the pytorch dataloaders for 3D datasets: ModelNet40, SahpeNet core55 ,ScanObjectNN, and ShapeNet Parts 
 - `blender_simplify.py` is the Blender code used to simplify the meshes with `simplify_mesh` function from `util.py` as the   following :  
 ```python 
 simplify_ratio  = 0.05 # the ratio of faces to be maintained after simplification 
