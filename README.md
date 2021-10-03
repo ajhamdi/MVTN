@@ -1,6 +1,6 @@
 # MVTN: Multi-View Transformation Network for 3D Shape Recognition (ICCV 2021)
 By [Abdullah Hamdi](https://abdullahamdi.com/), [Silvio Giancola](https://www.silviogiancola.com/), [Bernard Ghanem](http://www.bernardghanem.com/)
-### [Paper](https://arxiv.org/pdf/2011.13244.pdf) | Video | Tutorial . <br>
+### [Paper](https://arxiv.org/pdf/2011.13244.pdf) | [Video](https://youtu.be/1zaHx8ztlhk) | Tutorial . <br>
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/mvtn-multi-view-transformation-network-for-3d/3d-point-cloud-classification-on-scanobjectnn)](https://paperswithcode.com/sota/3d-point-cloud-classification-on-scanobjectnn?p=mvtn-multi-view-transformation-network-for-3d)
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/mvtn-multi-view-transformation-network-for-3d/3d-object-retrieval-on-modelnet40)](https://paperswithcode.com/sota/3d-object-retrieval-on-modelnet40?p=mvtn-multi-view-transformation-network-for-3d)
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/mvtn-multi-view-transformation-network-for-3d/3d-object-retrieval-on-shapenetcore-55)](https://paperswithcode.com/sota/3d-object-retrieval-on-shapenetcore-55?p=mvtn-multi-view-transformation-network-for-3d)[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/mvtn-multi-view-transformation-network-for-3d/3d-point-cloud-classification-on-modelnet40)](https://paperswithcode.com/sota/3d-point-cloud-classification-on-modelnet40?p=mvtn-multi-view-transformation-network-for-3d)
