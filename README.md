@@ -13,11 +13,13 @@ The official Pytroch code of ICCV 2021 paper [MVTN: Multi-View Transformation Ne
 ## Citation
 If you find our work useful in your research, please consider citing:
 ```bibtex
-@inproceedings{hamdi2021mvtn,
-  title={MVTN: Multi-View Transformation Network for 3D Shape Recognition},
-  author={Hamdi, Abdullah and Giancola, Silvio and Ghanem, Bernard},
-  booktitle={Proceedings of the IEEE/CVF International Conference on Computer Vision},
-  year={2021}
+@InProceedings{Hamdi_2021_ICCV,
+    author    = {Hamdi, Abdullah and Giancola, Silvio and Ghanem, Bernard},
+    title     = {MVTN: Multi-View Transformation Network for 3D Shape Recognition},
+    booktitle = {Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV)},
+    month     = {October},
+    year      = {2021},
+    pages     = {1-11}
 }
 ```
 
