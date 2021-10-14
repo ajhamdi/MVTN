@@ -51,7 +51,7 @@ print('\n Clearing blender scene (default garbage...)')
 bpy.ops.object.select_all(action='DESELECT')
 
 # selection
-bpy.data.objects['Camera'].select = True
+bpy.data.objects['Camera'].select_set(True)
 
 # remove it
 bpy.ops.object.delete() 
@@ -60,9 +60,9 @@ bpy.ops.object.delete()
 # select objects by type
 for o in bpy.data.objects:
     if o.type == 'MESH':
-        o.select = True
+        o.select_set(True)
     else:
-        o.select = False
+        o.select_set(False)
 
 # call the operator once
 bpy.ops.object.delete()
