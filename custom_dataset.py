@@ -437,7 +437,7 @@ class ShapeNetCore(ShapeNetBase):
         ), faces=faces.numpy()).sample(self.nb_points, False)
         points = torch.from_numpy(points).to(torch.float)
         points = torch_center_and_normalize(points, p=self.dset_norm)
-        return self.label_by_number[label_str], mesh, points, 1.0
+        return self.label_by_number[label_str], mesh, points
 
 
 class ScanObjectNN(torch.utils.data.Dataset):
@@ -540,7 +540,7 @@ class ScanObjectNN(torch.utils.data.Dataset):
 
         points = torch.from_numpy(points).to(torch.float)
         points = torch_center_and_normalize(points, p=self.dset_norm)
-        return label, None, points, 1.0
+        return label, None, points
 
     def __len__(self):
         return len(self.objects_paths[self.split])
