@@ -42,7 +42,7 @@ conda install pytorch3d -c pytorch3d
 ```bash
 conda install pandas
 conda install -c conda-forge trimesh
-pip install einops imageio scipy matplotlib tensorboard h5py
+pip install einops imageio scipy matplotlib tensorboard h5py metric-learn
 ``` 
 
 ## Usage: 3D Classification & Retrieval
