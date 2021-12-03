@@ -627,15 +627,15 @@ if setup["mvnetwork"] == "mvcnn":
 
             print('\nEvaluation:')
             print('\ttrain acc: %.2f - train Loss: %.4f' %
-                  (avg_train_acc.item(), avg_train_loss.item()))
+                  (avg_train_acc, avg_train_loss))
             print('\tVal Acc: %.2f - val Loss: %.4f' %
                   (avg_test_acc.item(), avg_loss))
             print('\tCurrent best val acc: %.2f' % setup["best_acc"])
             if setup["log_metrics"]:
-                writer.add_scalar('Loss/train', avg_train_loss.item(), epoch)
+                writer.add_scalar('Loss/train', avg_train_loss, epoch)
                 writer.add_scalar('Loss/val', avg_loss, epoch)
                 writer.add_scalar('Accuracy/train',
-                                  avg_train_acc.item(), epoch)
+                                  avg_train_acc, epoch)
                 writer.add_scalar('Accuracy/val', avg_test_acc.item(), epoch)
             saveables = {'epoch': epoch + 1,
                          'state_dict': models_bag["mvnetwork"].state_dict(),
