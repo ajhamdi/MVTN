@@ -11,7 +11,7 @@ from torch._six import inf
 from pytorch3d.renderer import look_at_view_transform
 
 
-EXAHSTION_LIMIT = 20
+EXAHSTION_LIMIT = 100
 
 
 def initialize_setup(setup):
