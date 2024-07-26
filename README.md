@@ -47,13 +47,13 @@ pip install einops imageio scipy matplotlib tensorboard h5py metric-learn
 
 ## Usage: 3D Classification & Retrieval
 
-The main Python script in the root directorty `run_mvtn.py`. 
+The main Python script is in the root directory `run_mvtn.py`. 
 
-First download the datasets and unzip inside the `data/` directories as follows: 
+First, download the datasets and unzip them inside the `data/` directories as follows: 
 
-- ModelNet40 [this link](https://drive.google.com/file/d/157W0qYR2yQAc5qKmXlZuHms66wmUM8Hi/view?usp=sharing) (ModelNet objects meshes are simplified to fit the GPU and allows for backpropogation ). 
+- ModelNet40 [this link](https://drive.google.com/file/d/157W0qYR2yQAc5qKmXlZuHms66wmUM8Hi/view?usp=sharing) (ModelNet objects meshes are simplified to fit the GPU and allow for backpropogation ). 
 
-- ShapeNet Core55 v2 [this link](https://shapenet.org/download/shapenetcore) ( You need to create an account) 
+- ShapeNet Core55 v2 [this link](https://shapenet.org/download/shapenetcore) ( You need to create an account) . Make sure to put the two files [shapenet_synset_dict_v2.json](https://github.com/ajhamdi/MVTN/blob/master/data/shapenet_synset_dict_v2.json) and [shapenet_split.csv](https://github.com/ajhamdi/MVTN/blob/master/data/shapenet_split.csv) inside the ShapeNet directory. 
 
 - ScanObjectNN [this link](https://drive.google.com/file/d/15xhYA8SC5EdLKZA_xV0FXyRy8f-qGMs5/view?usp=sharing) (ScanObjectNN with its three main variants [`obj_only` ,`with_bg` , `hardest`] controlled by the `--dset_variant` option  ). 
 
