@@ -51,11 +51,11 @@ The main Python script is in the root directory `run_mvtn.py`.
 
 First, download the datasets and unzip them inside the `data/` directories as follows: 
 
-- ModelNet40 [this link](https://drive.google.com/file/d/157W0qYR2yQAc5qKmXlZuHms66wmUM8Hi/view?usp=sharing) (ModelNet objects meshes are simplified to fit the GPU and allow for backpropogation ). 
+- ModelNet40 [this link](https://mega.nz/file/mm5FhJ7I#jGECWn-QSCLH9LLoxhZzSWnf9LCtCavV12toj9SJKPM) (ModelNet objects meshes are simplified to fit the GPU and allow for backpropogation ). 
 
 - ShapeNet Core55 v2 [this link](https://shapenet.org/download/shapenetcore) ( You need to create an account) . Make sure to put the two files [shapenet_synset_dict_v2.json](https://github.com/ajhamdi/MVTN/blob/master/data/shapenet_synset_dict_v2.json) and [shapenet_split.csv](https://github.com/ajhamdi/MVTN/blob/master/data/shapenet_split.csv) inside the ShapeNet directory. 
 
-- ScanObjectNN [this link](https://drive.google.com/file/d/15xhYA8SC5EdLKZA_xV0FXyRy8f-qGMs5/view?usp=sharing) (ScanObjectNN with its three main variants [`obj_only` ,`with_bg` , `hardest`] controlled by the `--dset_variant` option  ). 
+- ScanObjectNN [this link](https://mega.nz/file/ampg2QyT#Exo22r-8jzgCa2MOqoqipd39HVqYKG5iykJ5bovjsuI) (ScanObjectNN with its three main variants [`obj_only` ,`with_bg` , `hardest`] controlled by the `--dset_variant` option  ). 
 
 Then you can run MVTN with 
 ```bash
